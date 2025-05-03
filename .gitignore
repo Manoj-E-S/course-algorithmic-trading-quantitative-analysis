@@ -1,0 +1,23 @@
+## RESPONSE CACHING
+data/
+
+## ENVIRONMENT VARIABLES
+# Ignore the .env file to prevent sensitive information from being exposed
+.env
+
+## PYTHON
+# Ignore Python bytecode files
+__pycache__/
+*.py[cod]
+# Ignore Python egg files
+*.egg
+*.egg-info/
+# Ignore Python distribution files
+dist/
+build/
+# Ignore Python virtual environment directories
+# This is a common name for virtual environments
+# You may want to adjust this if you use a different name for your virtual environment
+.venv/
+# Ignore poetry.lock file
+poetry.lock
