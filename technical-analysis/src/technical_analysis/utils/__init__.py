@@ -1,0 +1,1 @@
+from technical_analysis.utils.singleton_util import SingletonMeta

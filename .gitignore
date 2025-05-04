@@ -1,5 +1,5 @@
 ## RESPONSE CACHING
-data/
+response_cache/
 
 ## ENVIRONMENT VARIABLES
 # Ignore the .env file to prevent sensitive information from being exposed
