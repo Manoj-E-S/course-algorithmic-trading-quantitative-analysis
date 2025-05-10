@@ -1,6 +1,6 @@
-from enum import Enum
+from technical_analysis.utils import EnumWithValuesList
 
-class OHLCVEnum(Enum):
+class OHLCVEnum(EnumWithValuesList):
     OPEN = "open"
     HIGH = "high"
     LOW = "low"

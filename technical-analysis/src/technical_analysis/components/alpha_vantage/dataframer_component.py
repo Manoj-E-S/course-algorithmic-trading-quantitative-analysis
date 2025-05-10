@@ -18,7 +18,7 @@ class DataframerComponent:
     def __get_aggregated_data_for_multiple_instruments(
         candle_span: CandlespanEnum,
         instrument_symbols: list[str]
-    ) -> dict:
+    ) -> dict[str, dict]:
         """
         Aggregates responses of all instruments in instrument_symbols and returns a dict with symbol as key and its response data as value
 
@@ -67,16 +67,16 @@ class DataframerComponent:
 
 
     @staticmethod
-    def get_dataframe(
-        of_metric: OHLCVEnum,
+    def get_dataframe_of_metric(
+        metric: OHLCVEnum,
         candle_span: CandlespanEnum,
         instrument_symbols: list[str]
     ) -> pd.DataFrame | None:
         """
-        Returns a dataframe with dates as index, instrument symbols as columns and of_metric as the cell-metric
+        Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
 
         Args:
-            of_metric(OHLCVEnum): What metric out of OHLCV should be populated as the cell-data
+            metric(OHLCVEnum): What metric out of OHLCV should be populated as the cell-data
             candle_span(CandlespanEnum): Is the candle requirement daily, weekly or monthly
             instrument_symbols(list[str]): Which instruments' data should be included
 
@@ -97,7 +97,7 @@ class DataframerComponent:
             datewise_ohlcv: dict = json_data[ToTimeSeriesJsonKeyMappers.CANDLESPAN_MAINJSONKEY_MAPPER[candle_span]]
 
             series_data = {
-                date: float(values[CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][of_metric]])
+                date: float(values[CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][metric]])
                 for date, values in datewise_ohlcv.items() if values
             }
             symbolwise_closes_dict[symbol] = pd.Series(series_data)
@@ -108,4 +108,47 @@ class DataframerComponent:
         df.sort_index(inplace=True)
 
         return df
+    
+
+    @staticmethod
+    def get_ohlcv_dataframe_by_symbol(
+        candle_span: CandlespanEnum,
+        instrument_symbol: str
+    ) -> pd.DataFrame | None:
+        """
+        Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
+
+        Args:
+            metric(OHLCVEnum): What metric out of OHLCV should be populated as the cell-data
+            candle_span(CandlespanEnum): Is the candle requirement daily, weekly or monthly
+            instrument_symbol(str): Data of which instrument should be included
+
+        Returns:
+            (pd.DataFrame | None): DataFrame with the required data if the data could be retrieved, None otherwise
+        
+        Note:
+            If the api fails to fetch some of the instruments' data, the partial dictionary is returned.
+        """
+        instruments: dict[str, dict] = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, [instrument_symbol])
+
+        if not instruments[instrument_symbol]: # instrument was not fetched
+            return
+
+        datewise_ohlcv: dict = instruments[instrument_symbol][ToTimeSeriesJsonKeyMappers.CANDLESPAN_MAINJSONKEY_MAPPER[candle_span]]
+
+        datewise_ohlcv_df = (
+            pd.DataFrame.from_dict(datewise_ohlcv, orient='index').rename(
+                columns={
+                    CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.OPEN]: OHLCVEnum.OPEN.value,
+                    CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.HIGH]: OHLCVEnum.HIGH.value,
+                    CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.LOW]: OHLCVEnum.LOW.value,
+                    CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.CLOSE]: OHLCVEnum.CLOSE.value,
+                    CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.VOLUME]: OHLCVEnum.VOLUME.value
+                }
+            )
+        )
+        datewise_ohlcv_df.index = pd.to_datetime(datewise_ohlcv_df.index)
+        datewise_ohlcv_df.sort_index(inplace=True)
+
+        return datewise_ohlcv_df
             

@@ -3,7 +3,7 @@ import pandas as pd
 from technical_analysis.components.alpha_vantage import DataframerComponent
 from technical_analysis.models import OHLCVEnum, CandlespanEnum
 
-class DataOperatorComponent:
+class StockMetricIndicationComponent:
     """
     A component to operate on the date-x-instrument dataframe of an OHLCV metric
     """
@@ -24,11 +24,16 @@ class DataOperatorComponent:
     
 
     def __make_df(self) -> None:
-        self.__df: pd.DataFrame = DataframerComponent.get_dataframe(
+        df: pd.DataFrame | None = DataframerComponent.get_dataframe_of_metric(
             self.__metric,
             self.__candle_span,
             self.__instrument_symbols
         )
+
+        if df is None:
+            raise ValueError(f"Could not fetch dataframe for metric: {self.__metric.value}, candle_span: {self.__candle_span.value}, instrument_symbols: {self.__instrument_symbols}")
+        
+        self.__df = df
         self.__handle_na_by_strategy()
     
 
@@ -153,7 +158,7 @@ class DataOperatorComponent:
     def get_exponential_moving_operation_results(
         self, 
         com: float,
-        operation: Literal['mean', 'var', 'std'], 
+        operation: Literal['mean', 'var', 'std', 'corr', 'cov'], 
         min_periods: int = 0,
         use_change_in_metric_df: bool = False
     ) -> pd.DataFrame:
@@ -169,6 +174,10 @@ class DataOperatorComponent:
             return df.ewm(com=com, min_periods=min_periods).var().dropna(axis='index')
         elif operation == 'std':
             return df.ewm(com=com, min_periods=min_periods).std().dropna(axis='index')
+        elif operation == 'corr':
+            return df.ewm(com=com, min_periods=min_periods).corr().dropna(axis='index')
+        elif operation == 'cov':
+            return df.ewm(com=com, min_periods=min_periods).cov().dropna(axis='index')
         else:
             raise ValueError(f"Unsupported operation: {operation}")
         
