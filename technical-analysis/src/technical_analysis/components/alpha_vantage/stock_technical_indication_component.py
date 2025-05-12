@@ -1,103 +1,58 @@
-from typing import Literal
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import MaxNLocator
 import pandas as pd
-from technical_analysis.components.alpha_vantage import DataframerComponent
-from technical_analysis.models import CandlespanEnum, OHLCVEnum
+
+from technical_analysis.components.alpha_vantage import DataStoreComponent
+
 
 class StockTechnicalIndicationComponent:
     """
     A class to represent all technical indicators.
-    This class is responsible for providing technical indicators on the dataframe it is configured with.
+    This class is responsible for providing technical indicators on the data store's instrument it is configured with.
     """
     def __init__(
         self,
-        metric: OHLCVEnum,
-        candle_span: CandlespanEnum,
-        instrument_symbol: str,
-        na_strategy: Literal['drop_date', 'drop_metric', 'backfill', 'forwardfill'] = 'backfill'
+        financial_data_store: DataStoreComponent,
+        instrument_symbol: str
     ):
-        self.__metric = metric
-        self.__candle_span = candle_span
-        self.__instrument_symbol = instrument_symbol
-        self.__na_strategy = na_strategy
+        self.__store: DataStoreComponent = financial_data_store
 
-        self.__make_dfs_dict()
+        if not self.__store.is_instrument_valid(instrument_symbol):
+            print(f"[ERROR] {self.__class__.__name__} class Initialization Error")
+            error_message: str = f"Instrument {instrument_symbol} is invalid"
+            raise ValueError(error_message)
+
+        self.__instrument_symbol: str = instrument_symbol
+        self.__df: pd.DataFrame = self.__store.instrument_ohlcvdf_dict.get(self.__instrument_symbol)
     
 
     # Getters
     @property
-    def metric(self) -> OHLCVEnum:
-        return self.__metric.value
-
-    @property
-    def candle_span(self) -> CandlespanEnum:
-        return self.__candle_span.value
+    def data_store(self) -> DataStoreComponent:
+        return self.__store
     
     @property
     def instrument_symbol(self) -> str:
         return self.__instrument_symbol
     
 
-    # Setters
-    @metric.setter
-    def metric(self, metric: OHLCVEnum) -> None:
-        self.__metric = metric
+    # Chainable Setters
+    @data_store.setter
+    def data_store(self, data_store: DataStoreComponent) -> 'StockTechnicalIndicationComponent':
+        self.__store = data_store
+        return self
     
-    @candle_span.setter
-    def candle_span(self, candle_span: CandlespanEnum) -> None:
-        self.__candle_span = candle_span
-        self.__make_dfs_dict()
-
     @instrument_symbol.setter
-    def instrument_symbol(self, instrument_symbol: str) -> None:
+    def instrument_symbol(self, instrument_symbol: str) -> 'StockTechnicalIndicationComponent':
         self.__instrument_symbol = instrument_symbol
-        self.__make_dfs_dict()
-    
-
-    # Private Methods
-    def __make_dfs_dict(self) -> None:
-        """
-        This method is responsible for creating the dataframes for the given instrument symbols.
-        """
-        df: pd.DataFrame = DataframerComponent.get_ohlcv_dataframe_by_symbol(self.__candle_span, self.__instrument_symbol)
-
-        if df is None:
-            raise ValueError(f"No data found for the given instrument symbol: {self.__instrument_symbol}")
-        
-        self.__df = df
-        self.__handle_na_by_strategy()
-    
-
-    def __backfillna(self) -> None:
-        self.__df.bfill(axis='index', inplace=True)
-        
-
-    def __forwardfillna(self) -> None:
-        self.__df.ffill(axis='index', inplace=True)
-
-    
-    def __dropna_by_date(self) -> None:
-        self.__df.dropna(axis='index', inplace=True)
-
-
-    def __dropna_by_metric(self) -> None:
-        self.__df.dropna(axis='columns', inplace=True)
-    
-
-    def __handle_na_by_strategy(self) -> None:
-        if self.__na_strategy == 'backfill':
-            self.__backfillna()
-        elif self.__na_strategy == 'forwardfill':
-            self.__forwardfillna()
-        elif self.__na_strategy == 'drop_date':
-            self.__dropna_by_date()
-        elif self.__na_strategy == 'drop_metric':
-            self.__dropna_by_metric()
+        return self
 
 
     # Methods
     def collect(self) -> pd.DataFrame:
         """
-        Returns the OHLCV+indicator_columns dataframe for the given instrument symbol.
+        Returns the dataframe with OHLCV columns and indicator columns (if any) for the associated instrument from the associated store.
         """
         return self.__df
     
@@ -116,20 +71,76 @@ class StockTechnicalIndicationComponent:
             MACD Signal line = signal_period_EMA of the MACD
 
         :param slow_period: The period for the slow EMA. Default is 26.
-        :param fast_period: The period for the fast EMA. Default is 12.
-        :param signal_period: The period for the signal line. Default is 9.
-
         :type slow_period: int
+        
+        :param fast_period: The period for the fast EMA. Default is 12.
         :type fast_period: int
+        
+        :param signal_period: The period for the signal line. Default is 9.
         :type signal_period: int
 
-        :returns: current object to allow method chaining.
+        :return: self
+        :rtype: StockTechnicalIndicationComponent
         """
-        self.__df['fast_ema'] = self.__df[self.__metric.value].ewm(span=fast_period, adjust=False).mean()
-        self.__df['slow_ema'] = self.__df[self.__metric.value].ewm(span=slow_period, adjust=False).mean()
-        self.__df['mcad'] = self.__df['fast_ema'] - self.__df['slow_ema']
-        self.__df['mcad_signal'] = self.__df['mcad'].ewm(span=signal_period, adjust=False).mean()
-        self.__df['mcad_histogram'] = self.__df['mcad'] - self.__df['mcad_signal']
+        self.__df['fast_ema']       = self.__df[self.data_store.metric].ewm(span=fast_period, adjust=False).mean()
+        self.__df['slow_ema']       = self.__df[self.data_store.metric].ewm(span=slow_period, adjust=False).mean()
+        self.__df['macd']           = self.__df['fast_ema'] - self.__df['slow_ema']
+        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period, adjust=False).mean()
+        self.__df['macd_histogram'] = self.__df['macd'] - self.__df['macd_signal']
+
         self.__df.drop(columns=['fast_ema', 'slow_ema'], inplace=True)
         
         return self
+    
+
+    def plot_macd(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the MACD for the configured instrument symbols.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        
+        :raises ValueError: If the MACD is not calculated yet.
+        """
+        if 'macd' not in self.__df.columns or 'macd_signal' not in self.__df.columns or 'macd_histogram' not in self.__df.columns:
+            raise ValueError("MACD not calculated yet. Please call the macd() method before plotting.")
+        
+        plt.style.use(styling)
+
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1, 1]})
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        main_df = self.data_store.main_metric_df
+
+        ax1.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
+        ax1.set_title(f"{self.data_store.metric.capitalize()}s")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
+
+        ax2.plot(self.__df.index, self.__df['macd'], label='MACD', color='blue')
+        ax2.plot(self.__df.index, self.__df['macd_signal'], label='Signal Line', color='red')
+        ax2.set_title(f"MACD Line & Signal Line")
+        ax2.legend()
+
+        ax3.bar(self.__df.index, self.__df['macd_histogram'], color='gray', alpha=0.5, width=1.0, label='Histogram')
+        ax3.axhline(0, color='black', lw=1, linestyle='--')
+        ax3.set_xlabel("Date")
+        ax3.set_title("MACD Histogram")
+        ax3.legend().set_visible(False)
+
+        ax3.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()

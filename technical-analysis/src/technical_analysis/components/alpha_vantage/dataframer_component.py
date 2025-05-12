@@ -17,7 +17,8 @@ class DataframerComponent:
     @staticmethod
     def __get_aggregated_data_for_multiple_instruments(
         candle_span: CandlespanEnum,
-        instrument_symbols: list[str]
+        instrument_symbols: list[str],
+        use_api_cache_when_applicable: bool = True
     ) -> dict[str, dict]:
         """
         Aggregates responses of all instruments in instrument_symbols and returns a dict with symbol as key and its response data as value
@@ -25,6 +26,7 @@ class DataframerComponent:
         Args:
             candle_span(CandlespanEnum): Is the candle requirement daily, weekly or monthly
             instrument_symbols(list[str]): Which instruments' api_responses are to be aggregated
+            use_api_cache_when_applicable(bool): Retrieve from cache if applicable
 
         Returns:
             dict: aggregated api_responses
@@ -35,10 +37,12 @@ class DataframerComponent:
         """
         instruments: dict = {}
         for symbol in instrument_symbols:
-            # Get cached data if available
-            cached_instrument = ResponseCacherComponent.retrieve_from_cache(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol)
+            cached_instrument = None
+            if use_api_cache_when_applicable:
+                # Get cached data if available
+                cached_instrument = ResponseCacherComponent.retrieve_from_cache(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol)
 
-            if cached_instrument:
+            if cached_instrument is not None:
                 instruments[symbol] = cached_instrument
                 continue
 
@@ -70,7 +74,8 @@ class DataframerComponent:
     def get_dataframe_of_metric(
         metric: OHLCVEnum,
         candle_span: CandlespanEnum,
-        instrument_symbols: list[str]
+        instrument_symbols: list[str],
+        use_api_cache_when_applicable: bool = True
     ) -> pd.DataFrame | None:
         """
         Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
@@ -86,7 +91,7 @@ class DataframerComponent:
         Note:
             If the api fails to fetch some of the instruments' data, the partial dataframe is returned.
         """
-        instruments: dict = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, instrument_symbols)
+        instruments: dict = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, instrument_symbols, use_api_cache_when_applicable)
 
         if not instruments: # no instruments were fetched
             return
@@ -113,7 +118,8 @@ class DataframerComponent:
     @staticmethod
     def get_ohlcv_dataframe_by_symbol(
         candle_span: CandlespanEnum,
-        instrument_symbol: str
+        instrument_symbol: str,
+        use_api_cache_when_applicable: bool = True
     ) -> pd.DataFrame | None:
         """
         Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
@@ -125,13 +131,10 @@ class DataframerComponent:
 
         Returns:
             (pd.DataFrame | None): DataFrame with the required data if the data could be retrieved, None otherwise
-        
-        Note:
-            If the api fails to fetch some of the instruments' data, the partial dictionary is returned.
         """
-        instruments: dict[str, dict] = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, [instrument_symbol])
+        instruments: dict[str, dict] = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, [instrument_symbol], use_api_cache_when_applicable)
 
-        if not instruments[instrument_symbol]: # instrument was not fetched
+        if instruments.get(instrument_symbol, None) is None: # instrument was not fetched
             return
 
         datewise_ohlcv: dict = instruments[instrument_symbol][ToTimeSeriesJsonKeyMappers.CANDLESPAN_MAINJSONKEY_MAPPER[candle_span]]
@@ -151,4 +154,4 @@ class DataframerComponent:
         datewise_ohlcv_df.sort_index(inplace=True)
 
         return datewise_ohlcv_df
-            
+        

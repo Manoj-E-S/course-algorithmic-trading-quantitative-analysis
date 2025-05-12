@@ -1,6 +1,7 @@
 from typing import Literal
 
 import requests
+from technical_analysis.services.alpha_vantage._alpha_vantage_validation_service import AlphaVantageValidationService
 from technical_analysis.services.alpha_vantage._endpoints_service import EndpointsService
 from technical_analysis.services.alpha_vantage._auth_service import AuthService
 from technical_analysis.services._validation_service import ValidationService
@@ -55,8 +56,19 @@ class TimeSeriesService:
 
         if not (ValidationService.is_status_code_ok(response) and ValidationService.does_json_exist(response)):
             return
+        
+        response_json: dict = response.json()
+        if AlphaVantageValidationService.does_response_json_have_error_message(response_json):
+            print(f"\n[ERROR] Alpha Vantage API Error for instrument {symbol}")
+            print("[ERROR] Error Details:")
+            print(f"{response_json}\n")
+            return
 
-        return response.json()
+        if AlphaVantageValidationService.does_response_json_have_api_limit_message(response_json):
+            print("[ERROR] Alpha Vantage API Request Limit Error")
+            return
+
+        return response_json
     
 
     @staticmethod
