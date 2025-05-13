@@ -122,6 +122,38 @@ class StockTechnicalIndicationComponent:
         return self
     
 
+    def plot_main_metric(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the main metric line graph for the configured instrument symbol.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        """
+        plt.style.use(styling)
+
+        fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        self.__subplot_main_metric(ax1)
+
+        ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()
+
+
     def plot_macd(
         self,
         title: str | None = None,
@@ -149,12 +181,7 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        main_df = self.data_store.main_metric_df
-
-        ax1.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
-        ax1.set_title(f"{self.data_store.metric.capitalize()}s")
-        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
-        ax1.legend().set_visible(False)
+        self.__subplot_main_metric(ax1)
 
         ax2.plot(self.__df.index, self.__df['macd'], label='MACD', color='blue')
         ax2.plot(self.__df.index, self.__df['macd_signal'], label='Signal Line', color='red')
@@ -202,12 +229,7 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        main_df = self.data_store.main_metric_df
-
-        ax1.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
-        ax1.set_title(f"{self.data_store.metric.capitalize()}s")
-        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
-        ax1.legend().set_visible(False)
+        self.__subplot_main_metric(ax1)
 
         ax2.plot(self.__df.index, self.__df['atr'], label='ATR', color='blue')
         ax2.set_title(f"ATR Line")
@@ -219,3 +241,26 @@ class StockTechnicalIndicationComponent:
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
+
+
+    def __subplot_main_metric(
+        self,
+        ax: plt.Axes
+    ) -> None:
+        """
+        Subplots the main metric line graph in the given plt.Axes
+
+        :param ax: The axes along which to plot
+        :type ax: plt.Axes
+
+        :return: None
+        :rtype: None
+
+        Note: Does not show the plot, that is the responsibility of the plot method that calls this subplot method
+        """
+        main_df = self.data_store.main_metric_df
+
+        ax.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
+        ax.set_title(f"{self.data_store.metric.capitalize()}s")
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax.legend().set_visible(False)
