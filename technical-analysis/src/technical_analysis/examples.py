@@ -5,7 +5,7 @@ from technical_analysis.models import CandlespanEnum, OHLCVEnum
 if __name__ == "__main__":
 
     metric: OHLCVEnum = OHLCVEnum.CLOSE
-    candle_span: CandlespanEnum = CandlespanEnum.MONTHLY
+    candle_span: CandlespanEnum = CandlespanEnum.DAILY
     na_strategy: str = 'backfill'
     use_api_cache_when_applicable: bool = True
 
@@ -88,8 +88,10 @@ if __name__ == "__main__":
 
 
     for symbol, stock_technical in stock_technicals.items():
-        print(f"MACD indicator for {symbol}:")
-        print(stock_technical.macd().collect())
-        stock_technical.plot_macd()
-        print()
+        stock_technical.macd()
+        # stock_technical.plot_macd()
+        stock_technical.atr()
+        stock_technical.plot_atr()
 
+        print(f"Indicator-Augmented Dataframe for {symbol}:")
+        print(stock_technical.collect())

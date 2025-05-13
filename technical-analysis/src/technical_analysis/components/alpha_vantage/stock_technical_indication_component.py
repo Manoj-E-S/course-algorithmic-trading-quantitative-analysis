@@ -4,6 +4,7 @@ from matplotlib.ticker import MaxNLocator
 import pandas as pd
 
 from technical_analysis.components.alpha_vantage import DataStoreComponent
+from technical_analysis.models import OHLCVEnum
 
 
 class StockTechnicalIndicationComponent:
@@ -64,7 +65,7 @@ class StockTechnicalIndicationComponent:
         signal_period: int = 9
     ) -> 'StockTechnicalIndicationComponent':
         """
-        Calculate the MACD (Moving Average Convergence Divergence) for the configured instrument symbols, and include it in the corresponding dataframe.
+        Calculate the MACD (Moving Average Convergence Divergence) for the configured instrument symbol, and include it in the dataframe.
         
         The MACD is calculated using the following formula:
             MACD = fast_period_EMA - slow_period_EMA
@@ -85,11 +86,39 @@ class StockTechnicalIndicationComponent:
         self.__df['fast_ema']       = self.__df[self.data_store.metric].ewm(span=fast_period, adjust=False).mean()
         self.__df['slow_ema']       = self.__df[self.data_store.metric].ewm(span=slow_period, adjust=False).mean()
         self.__df['macd']           = self.__df['fast_ema'] - self.__df['slow_ema']
-        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period, adjust=False).mean()
+        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period).mean()
         self.__df['macd_histogram'] = self.__df['macd'] - self.__df['macd_signal']
 
         self.__df.drop(columns=['fast_ema', 'slow_ema'], inplace=True)
         
+        return self
+    
+
+    def atr(
+        self,
+        window: int = 14
+    ) -> 'StockTechnicalIndicationComponent':
+        """
+        Calculate the ATR (Average true Range) for the configured instrument symbol, and include it in the dataframe.
+        
+        The ATR is calculated using the following formula:
+            TR = max((high - low), abs(high - prev_close), abs(low - prev_close))
+            ATR = EMA(TR)
+
+        :param window: The period for the EMA of the True Range(TR). Default is 14.
+        :type window: int
+
+        :return: self
+        :rtype: StockTechnicalIndicationComponent
+        """
+        self.__df["H-L"]    = self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.LOW.value]
+        self.__df["H-PC"]   = (self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
+        self.__df["L-PC"]   = (self.__df[OHLCVEnum.LOW.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
+        self.__df["TR"]     = self.__df[["H-L", "H-PC", "L-PC"]].max(axis='columns', skipna=False)
+        self.__df["atr"]    = self.__df["TR"].ewm(span=window).mean()
+
+        self.__df.drop(columns=["H-L", "H-PC", "L-PC", "TR"], inplace=True)
+
         return self
     
 
@@ -99,7 +128,7 @@ class StockTechnicalIndicationComponent:
         styling: str = 'ggplot'
     ) -> None:
         """
-        Plot the MACD for the configured instrument symbols.
+        Plot the MACD for the configured instrument symbol.
 
         :param title: The title of the plot.
         :type title: str | None
@@ -140,6 +169,52 @@ class StockTechnicalIndicationComponent:
 
         ax3.xaxis.set_major_locator(mdates.AutoDateLocator())
         ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()
+
+
+    def plot_atr(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the ATR for the configured instrument symbol.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        
+        :raises ValueError: If the ATR is not calculated yet.
+        """
+        if 'atr' not in self.__df.columns:
+            raise ValueError("ATR not calculated yet. Please call the atr() method before plotting.")
+        
+        plt.style.use(styling)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        main_df = self.data_store.main_metric_df
+
+        ax1.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
+        ax1.set_title(f"{self.data_store.metric.capitalize()}s")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
+
+        ax2.plot(self.__df.index, self.__df['atr'], label='ATR', color='blue')
+        ax2.set_title(f"ATR Line")
+        ax2.legend().set_visible(False)
+
+        ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
         fig.autofmt_xdate(rotation=70)
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])

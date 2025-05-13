@@ -9,6 +9,7 @@ class DataframerComponent:
     """
     A component to map JSON responses into pandas.Dataframe and provide related support
     """
+    ResponseCacherComponent.set_cache_threshold_period(5)
 
     def __init__(self):
         pass
@@ -140,7 +141,9 @@ class DataframerComponent:
         datewise_ohlcv: dict = instruments[instrument_symbol][ToTimeSeriesJsonKeyMappers.CANDLESPAN_MAINJSONKEY_MAPPER[candle_span]]
 
         datewise_ohlcv_df = (
-            pd.DataFrame.from_dict(datewise_ohlcv, orient='index').rename(
+            pd.DataFrame
+            .from_dict(datewise_ohlcv, orient='index', dtype='float64')
+            .rename(
                 columns={
                     CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.OPEN]: OHLCVEnum.OPEN.value,
                     CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.HIGH]: OHLCVEnum.HIGH.value,
@@ -149,6 +152,13 @@ class DataframerComponent:
                     CandlespanMappers.CANDLESPAN_OHLCVMAPPER_MAPPER[candle_span][OHLCVEnum.VOLUME]: OHLCVEnum.VOLUME.value
                 }
             )
+            .filter([
+                OHLCVEnum.OPEN.value,
+                OHLCVEnum.HIGH.value,
+                OHLCVEnum.LOW.value,
+                OHLCVEnum.CLOSE.value,
+                OHLCVEnum.VOLUME.value
+            ])
         )
         datewise_ohlcv_df.index = pd.to_datetime(datewise_ohlcv_df.index)
         datewise_ohlcv_df.sort_index(inplace=True)

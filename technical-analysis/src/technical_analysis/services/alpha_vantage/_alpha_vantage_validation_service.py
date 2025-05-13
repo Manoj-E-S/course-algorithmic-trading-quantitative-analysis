@@ -27,6 +27,8 @@ class AlphaVantageValidationService:
         :Scenario handled:
         Alpha vantage api responds with status code 200 OK, even when api response is an INFO Response relating to the daily api request limit :)
         """
-        if any(["limit" in value.lower() for value in response_json.values()]) or any(["note" in key.lower() for key in response_json.keys()]):
-            return True
+        for k, v in response_json.items():
+            if "info" in k.lower() or "note" in k.lower():
+                if "limit" in v.lower():
+                    return True
         return False
