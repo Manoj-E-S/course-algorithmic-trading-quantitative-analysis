@@ -88,12 +88,9 @@ if __name__ == "__main__":
 
 
     for symbol, stock_technical in stock_technicals.items():
-        stock_technical.macd()
-        # stock_technical.plot_macd()
-        stock_technical.atr()
-        # stock_technical.plot_atr()
-        stock_technical.bollinger_bands()
-        stock_technical.plot_bollinger_bands()
+        stock_technical.macd()#.plot_macd()
+        stock_technical.atr()#.plot_atr()
+        stock_technical.bollinger_bands()#.plot_bollinger_bands(should_plot_band_width=False)
 
         print(f"Indicator-Augmented Dataframe for {symbol}:")
         print(stock_technical.collect())

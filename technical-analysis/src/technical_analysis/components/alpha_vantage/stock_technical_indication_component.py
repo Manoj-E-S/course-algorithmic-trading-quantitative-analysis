@@ -271,11 +271,15 @@ class StockTechnicalIndicationComponent:
     
     def plot_bollinger_bands(
         self,
+        should_plot_band_width: bool = True,
         title: str | None = None,
         styling: str = 'ggplot'
     ) -> None:
         """
         Plot the Bollinger Bands for the configured instrument symbol.
+
+        :param should_plot_band_width: If a separate plot od the band wwidths is required.
+        :type should_plot_band_width: bool
 
         :param title: The title of the plot.
         :type title: str | None
@@ -293,7 +297,12 @@ class StockTechnicalIndicationComponent:
         
         plt.style.use(styling)
 
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        ax2: plt.Axes = None
+        if should_plot_band_width:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        else:
+            fig, ax1 = plt.subplots(1, 1, figsize=(14, 8))
+        
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
         self.__subplot_main_metric(ax1)
@@ -303,11 +312,15 @@ class StockTechnicalIndicationComponent:
         ax1.plot(self.__df.index, self.__df['lower_boll_band'], label='Lower Band', color='green')
         ax1.legend().set_visible(True)
 
-        ax2.plot(self.__df.index, self.__df['band_width'], label='Band Width', color='brown')
-        ax2.set_title(f"Band Width")
-
-        ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        if ax2:
+            ax2.plot(self.__df.index, self.__df['band_width'], label='Band Width', color='brown')
+            ax2.set_title(f"Band Width")
+            ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        else:
+            ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        
         fig.autofmt_xdate(rotation=70)
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
