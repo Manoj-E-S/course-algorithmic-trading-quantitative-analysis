@@ -122,6 +122,32 @@ class StockTechnicalIndicationComponent:
         return self
     
 
+    def bollinger_bands(
+        self,
+        window: int = 20
+    ) -> 'StockTechnicalIndicationComponent':
+        """
+        Calculate the Bollinger band data for the configured instrument symbol, and include it in the dataframe.
+        
+        The Bollinger band data is calculated using the following formula:
+            middle_boll_band = window_period_SMA(close)
+            upper_boll_band = middle_boll_band + 2*window_period_std(close) [for population]
+            lower_boll_band = middle_boll_band - 2*window_period_std(close) [for population]
+
+        :param window: The period for the SMA for the middle_boll_band. Default is 20.
+        :type window: int
+
+        :return: self
+        :rtype: StockTechnicalIndicationComponent
+        """
+        self.__df["middle_boll_band"] = self.__df[OHLCVEnum.CLOSE.value].rolling(window).mean()
+        self.__df["upper_boll_band"] = self.__df["middle_boll_band"] + 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
+        self.__df["lower_boll_band"] = self.__df["middle_boll_band"] - 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
+        self.__df["band_width"] = self.__df["upper_boll_band"] - self.__df["lower_boll_band"]
+
+        return self
+    
+
     def plot_main_metric(
         self,
         title: str | None = None,
@@ -234,6 +260,51 @@ class StockTechnicalIndicationComponent:
         ax2.plot(self.__df.index, self.__df['atr'], label='ATR', color='blue')
         ax2.set_title(f"ATR Line")
         ax2.legend().set_visible(False)
+
+        ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()
+
+    
+    def plot_bollinger_bands(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the Bollinger Bands for the configured instrument symbol.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        
+        :raises ValueError: If the ATR is not calculated yet.
+        """
+        if 'middle_boll_band' not in self.__df.columns or 'upper_boll_band' not in self.__df.columns or 'lower_boll_band' not in self.__df.columns or 'band_width' not in self.__df.columns:
+            raise ValueError("Bollinger Bands not calculated yet. Please call the bollinger_bands() method before plotting.")
+        
+        plt.style.use(styling)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        self.__subplot_main_metric(ax1)
+
+        ax1.plot(self.__df.index, self.__df['middle_boll_band'], label='Middle Band', color='blue')
+        ax1.plot(self.__df.index, self.__df['upper_boll_band'], label='Upper Band', color='red')
+        ax1.plot(self.__df.index, self.__df['lower_boll_band'], label='Lower Band', color='green')
+        ax1.legend().set_visible(True)
+
+        ax2.plot(self.__df.index, self.__df['band_width'], label='Band Width', color='brown')
+        ax2.set_title(f"Band Width")
 
         ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
         ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
