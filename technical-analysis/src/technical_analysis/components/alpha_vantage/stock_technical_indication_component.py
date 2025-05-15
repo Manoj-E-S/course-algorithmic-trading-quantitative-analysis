@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator
+import numpy as np
 import pandas as pd
 
 from technical_analysis.components.alpha_vantage import DataStoreComponent
@@ -140,11 +141,46 @@ class StockTechnicalIndicationComponent:
         :return: self
         :rtype: StockTechnicalIndicationComponent
         """
-        self.__df["middle_boll_band"] = self.__df[OHLCVEnum.CLOSE.value].rolling(window).mean()
-        self.__df["upper_boll_band"] = self.__df["middle_boll_band"] + 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
-        self.__df["lower_boll_band"] = self.__df["middle_boll_band"] - 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
-        self.__df["band_width"] = self.__df["upper_boll_band"] - self.__df["lower_boll_band"]
+        self.__df["middle_boll_band"]   = self.__df[OHLCVEnum.CLOSE.value].rolling(window).mean()
+        self.__df["upper_boll_band"]    = self.__df["middle_boll_band"] + 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
+        self.__df["lower_boll_band"]    = self.__df["middle_boll_band"] - 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
+        self.__df["band_width"]         = self.__df["upper_boll_band"] - self.__df["lower_boll_band"]
 
+        return self
+    
+
+    def rsi(
+        self,
+        window: int = 14
+    ) -> 'StockTechnicalIndicationComponent':
+        """
+        Calculate the RSI (Relative Strength Index) for the configured instrument symbol, and include it in the dataframe.
+        
+        The RSI is calculated using the following formulae:
+            change = current_close - previous_close
+            gain = change >= 0 ? change : 0
+            loss = change < 0 ? -1*change : 0
+            avg_gain = rma(gain, window) (Reference - https://www.tradingcode.net/tradingview/relative-moving-average/#calculation-process)
+            avg_loss = rma(loss, window) (Reference - https://www.tradingcode.net/tradingview/relative-moving-average/#calculation-process)
+            rs = avg_gain/avg_loss
+            rsi = 100 - (100 / (1 + rs))
+
+        :param window: The period for all the operations Default is 14.
+        :type window: int
+
+        :return: self
+        :rtype: StockTechnicalIndicationComponent
+        """
+        self.__df['close_change']   = self.__df[OHLCVEnum.CLOSE.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)
+        self.__df['gain']           = self.__df['close_change'].apply(lambda x: x if x >= 0 else 0.0)
+        self.__df['loss']           = self.__df['close_change'].apply(lambda x: -x if x < 0 else 0.0)
+        self.__df['avg_gain']       = self.__df['gain'].ewm(alpha=(1/window)).mean()
+        self.__df['avg_loss']       = self.__df['loss'].ewm(alpha=(1/window)).mean()
+        self.__df['rs']             = self.__df['avg_gain'] / self.__df['avg_loss']
+        self.__df['rsi']            = 100 - (100 / ( 1 + self.__df['rs']))
+
+        self.__df.drop(columns=['close_change', 'gain', 'loss', 'avg_gain', 'avg_loss', 'rs'], inplace=True)
+        
         return self
     
 
@@ -321,6 +357,49 @@ class StockTechnicalIndicationComponent:
             ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
             ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
         
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()
+
+    
+    def plot_rsi(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the ATR for the configured instrument symbol.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        
+        :raises ValueError: If the ATR is not calculated yet.
+        """
+        if 'rsi' not in self.__df.columns:
+            raise ValueError("RSI not calculated yet. Please call the rsi() method before plotting.")
+        
+        plt.style.use(styling)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        self.__subplot_main_metric(ax1)
+
+        ax2.plot(self.__df.index, self.__df['rsi'], label='RSI', color='green')
+        ax2.plot(self.__df.index, np.repeat([70], self.__df.index.size), color='purple')
+        ax2.plot(self.__df.index, np.repeat([30], self.__df.index.size), color='purple')
+        ax2.set_title(f"RSI")
+        ax2.legend().set_visible(False)
+
+        ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
         fig.autofmt_xdate(rotation=70)
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
