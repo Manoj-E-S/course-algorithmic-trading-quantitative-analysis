@@ -91,7 +91,8 @@ if __name__ == "__main__":
         stock_technical.macd()#.plot_macd()
         stock_technical.atr()#.plot_atr()
         stock_technical.bollinger_bands()#.plot_bollinger_bands(should_plot_band_width=False)
-        stock_technical.rsi().plot_rsi()
+        stock_technical.rsi()#.plot_rsi()
+        stock_technical.adx().plot_adx()
 
         print(f"Indicator-Augmented Dataframe for {symbol}:")
         print(stock_technical.collect())

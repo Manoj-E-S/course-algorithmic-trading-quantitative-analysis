@@ -184,6 +184,53 @@ class StockTechnicalIndicationComponent:
         return self
     
 
+    def adx(
+        self,
+        window: int = 14
+    ) -> 'StockTechnicalIndicationComponent':
+        """
+        Calculate the ADX (Average Directional Index) for the configured instrument symbol, and include it in the dataframe.
+        
+        The ADX is calculated using the following formulae:
+            DM_up = (curr_high - prev_high) > (prev_low - curr_low) ? max((curr_high - prev_high), 0) : 0
+            DM_down = (curr_high - prev_high) < (prev_low - curr_low) ? max((prev_low - curr_low), 0) : 0
+            DI_up = 100*EMA(DM_up)/ATR
+            DI_down = 100*EMA(DM_down)/ATR
+            DX = abs((DI_up - DI_down)/(DI_up + DI_down))
+            ADX = 100*EMA(DX)
+
+        :param window: The period for all the operations; Default is 14.
+        :type window: int
+
+        :return: self
+        :rtype: StockTechnicalIndicationComponent
+        """
+        do_not_delete_atr_post_calculation: bool = False
+        if 'atr' in self.__df.columns:
+            do_not_delete_atr_post_calculation = True
+        else:
+            self.atr()
+        
+        self.__df['hh']         = self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.HIGH.value].shift(1)
+        self.__df['ll']         = self.__df[OHLCVEnum.LOW.value].shift(1) - self.__df[OHLCVEnum.LOW.value]
+
+        self.__df['dm_up']      = self.__df[['hh','ll']].apply(lambda row: max(row['hh'], 0) if row['hh'] > row['ll'] else 0, axis='columns')
+        self.__df['dm_down']    = self.__df[['hh','ll']].apply(lambda row: max(row['ll'], 0) if row['ll'] > row['hh'] else 0, axis='columns')
+
+        self.__df['di_up']      = (100/self.__df['atr']) * self.__df['dm_up'].ewm(alpha=(1/window)).mean()
+        self.__df['di_down']    = (100/self.__df['atr']) * self.__df['dm_down'].ewm(alpha=(1/window)).mean()
+
+        self.__df['dx']         = ((self.__df['di_up'] - self.__df['di_down']) / (self.__df['di_up'] + self.__df['di_down'])).abs()
+
+        self.__df['adx']        = 100 * self.__df['dx'].ewm(alpha=(1/window)).mean()
+
+        self.__df.drop(columns=['hh', 'll', 'dm_up', 'dm_down', 'di_up', 'di_down', 'dx'], inplace=True)
+        if not do_not_delete_atr_post_calculation:
+            self.__df.drop(columns=['atr'], inplace=True)
+        
+        return self
+    
+
     def plot_main_metric(
         self,
         title: str | None = None,
@@ -326,7 +373,7 @@ class StockTechnicalIndicationComponent:
         :return: None
         :rtype: None
         
-        :raises ValueError: If the ATR is not calculated yet.
+        :raises ValueError: If the Bollinger Bands data is not calculated yet.
         """
         if 'middle_boll_band' not in self.__df.columns or 'upper_boll_band' not in self.__df.columns or 'lower_boll_band' not in self.__df.columns or 'band_width' not in self.__df.columns:
             raise ValueError("Bollinger Bands not calculated yet. Please call the bollinger_bands() method before plotting.")
@@ -369,7 +416,7 @@ class StockTechnicalIndicationComponent:
         styling: str = 'ggplot'
     ) -> None:
         """
-        Plot the ATR for the configured instrument symbol.
+        Plot the RSI for the configured instrument symbol.
 
         :param title: The title of the plot.
         :type title: str | None
@@ -380,7 +427,7 @@ class StockTechnicalIndicationComponent:
         :return: None
         :rtype: None
         
-        :raises ValueError: If the ATR is not calculated yet.
+        :raises ValueError: If the RSI is not calculated yet.
         """
         if 'rsi' not in self.__df.columns:
             raise ValueError("RSI not calculated yet. Please call the rsi() method before plotting.")
@@ -396,6 +443,50 @@ class StockTechnicalIndicationComponent:
         ax2.plot(self.__df.index, np.repeat([70], self.__df.index.size), color='purple')
         ax2.plot(self.__df.index, np.repeat([30], self.__df.index.size), color='purple')
         ax2.set_title(f"RSI")
+        ax2.legend().set_visible(False)
+
+        ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
+        fig.autofmt_xdate(rotation=70)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.show()
+
+
+    def plot_adx(
+        self,
+        title: str | None = None,
+        styling: str = 'ggplot'
+    ) -> None:
+        """
+        Plot the ADX for the configured instrument symbol.
+
+        :param title: The title of the plot.
+        :type title: str | None
+
+        :param styling: The styling of the plot. Default is 'ggplot'.
+        :type styling: str
+        
+        :return: None
+        :rtype: None
+        
+        :raises ValueError: If the ADX is not calculated yet.
+        """
+        if 'adx' not in self.__df.columns:
+            raise ValueError("ADX not calculated yet. Please call the adx() method before plotting.")
+        
+        plt.style.use(styling)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+
+        self.__subplot_main_metric(ax1)
+
+        ax2.plot(self.__df.index, self.__df['adx'], label='ADX', color='blue')
+        ax2.plot(self.__df.index, np.repeat([25], self.__df.index.size), color='purple')
+        ax2.plot(self.__df.index, np.repeat([50], self.__df.index.size), color='orange')
+        ax2.plot(self.__df.index, np.repeat([75], self.__df.index.size), color='green')
+        ax2.set_title(f"ADX Line")
         ax2.legend().set_visible(False)
 
         ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
