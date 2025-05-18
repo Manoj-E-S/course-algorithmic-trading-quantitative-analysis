@@ -9,7 +9,6 @@ class DataframerComponent:
     """
     A component to map JSON responses into pandas.Dataframe and provide related support
     """
-    ResponseCacherComponent.set_cache_threshold_period(5)
 
     def __init__(self):
         pass
@@ -18,8 +17,7 @@ class DataframerComponent:
     @staticmethod
     def __get_aggregated_data_for_multiple_instruments(
         candle_span: CandlespanEnum,
-        instrument_symbols: list[str],
-        use_api_cache_when_applicable: bool = True
+        instrument_symbols: list[str]
     ) -> dict[str, dict]:
         """
         Aggregates responses of all instruments in instrument_symbols and returns a dict with symbol as key and its response data as value
@@ -27,7 +25,6 @@ class DataframerComponent:
         Args:
             candle_span(CandlespanEnum): Is the candle requirement daily, weekly or monthly
             instrument_symbols(list[str]): Which instruments' api_responses are to be aggregated
-            use_api_cache_when_applicable(bool): Retrieve from cache if applicable
 
         Returns:
             dict: aggregated api_responses
@@ -38,12 +35,10 @@ class DataframerComponent:
         """
         instruments: dict = {}
         for symbol in instrument_symbols:
-            cached_instrument = None
-            if use_api_cache_when_applicable:
-                # Get cached data if available
-                cached_instrument = ResponseCacherComponent.retrieve_from_cache(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol)
+            # Get cached data if available
+            cached_instrument = ResponseCacherComponent().retrieve_from_cache(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol)
 
-            if cached_instrument is not None:
+            if cached_instrument:
                 instruments[symbol] = cached_instrument
                 continue
 
@@ -63,7 +58,7 @@ class DataframerComponent:
                 continue
 
             # Cache the response
-            ResponseCacherComponent.cache_response_data(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol, response_data)
+            ResponseCacherComponent().cache_response_data(CandlespanMappers.CANDLESPAN_ALPHAVANTAGEENUM_MAPPER[candle_span], symbol, response_data)
 
             # Update instruments dict
             instruments[symbol] = response_data
@@ -75,8 +70,7 @@ class DataframerComponent:
     def get_dataframe_of_metric(
         metric: OHLCVEnum,
         candle_span: CandlespanEnum,
-        instrument_symbols: list[str],
-        use_api_cache_when_applicable: bool = True
+        instrument_symbols: list[str]
     ) -> pd.DataFrame | None:
         """
         Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
@@ -92,7 +86,7 @@ class DataframerComponent:
         Note:
             If the api fails to fetch some of the instruments' data, the partial dataframe is returned.
         """
-        instruments: dict = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, instrument_symbols, use_api_cache_when_applicable)
+        instruments: dict = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, instrument_symbols)
 
         if not instruments: # no instruments were fetched
             return
@@ -119,8 +113,7 @@ class DataframerComponent:
     @staticmethod
     def get_ohlcv_dataframe_by_symbol(
         candle_span: CandlespanEnum,
-        instrument_symbol: str,
-        use_api_cache_when_applicable: bool = True
+        instrument_symbol: str
     ) -> pd.DataFrame | None:
         """
         Returns a dataframe with dates as index, instrument symbols as columns and metric as the cell-metric
@@ -133,7 +126,7 @@ class DataframerComponent:
         Returns:
             (pd.DataFrame | None): DataFrame with the required data if the data could be retrieved, None otherwise
         """
-        instruments: dict[str, dict] = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, [instrument_symbol], use_api_cache_when_applicable)
+        instruments: dict[str, dict] = DataframerComponent.__get_aggregated_data_for_multiple_instruments(candle_span, [instrument_symbol])
 
         if instruments.get(instrument_symbol, None) is None: # instrument was not fetched
             return

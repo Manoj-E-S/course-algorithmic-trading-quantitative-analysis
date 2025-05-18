@@ -14,13 +14,11 @@ class DataStoreComponent:
         metric: OHLCVEnum,
         candle_span: CandlespanEnum,
         instrument_symbols: list[str],
-        na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = 'backfill',
-        use_api_cache_when_applicable: bool = True
+        na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = 'backfill'
     ):
         self.__metric: OHLCVEnum = metric
         self.__candle_span: CandlespanEnum = candle_span
         self.__na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = na_strategy
-        self.__use_api_cache_when_applicable: bool = use_api_cache_when_applicable
         
         print("[WARNING] Initializing DataStoreComponent instruments. Invalid instrument symbols (if any), will be dropped")
         self.__instrument_symbols: list[str] = self.valid_instruments(instrument_symbols)
@@ -43,10 +41,6 @@ class DataStoreComponent:
     def na_strategy(self) -> Literal['drop_index', 'drop_column', 'backfill', 'forwardfill']:
         return self.__na_strategy
     
-    @property
-    def use_api_cache_when_applicable(self) -> bool:
-        return self.__use_api_cache_when_applicable
-    
 
     # Chainable Setters
     @metric.setter
@@ -68,11 +62,6 @@ class DataStoreComponent:
     def na_strategy(self, na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill']) -> 'DataStoreComponent':
         self.__na_strategy = na_strategy
         return self
-    
-    @use_api_cache_when_applicable.setter
-    def use_api_cache_when_applicable(self, use_api_cache_when_applicable: bool) -> 'DataStoreComponent':
-        self.__use_api_cache_when_applicable = use_api_cache_when_applicable
-        return self
 
 
     # DataFrames
@@ -81,8 +70,7 @@ class DataStoreComponent:
         df: pd.DataFrame | None = DataframerComponent.get_dataframe_of_metric(
             self.__metric,
             self.__candle_span,
-            self.__instrument_symbols,
-            self.__use_api_cache_when_applicable
+            self.__instrument_symbols
         )
 
         if df is None:
@@ -95,7 +83,7 @@ class DataStoreComponent:
     def instrument_ohlcvdf_dict(self) -> dict[str, pd.DataFrame]:
         dfs_dict: dict[str, pd.DataFrame] = {}
         for instrument_symbol in self.__instrument_symbols:
-            df: pd.DataFrame = DataframerComponent.get_ohlcv_dataframe_by_symbol(self.__candle_span, instrument_symbol, self.__use_api_cache_when_applicable)
+            df: pd.DataFrame = DataframerComponent.get_ohlcv_dataframe_by_symbol(self.__candle_span, instrument_symbol)
 
             if df is None:
                 print(f"No data found for the given instrument symbol: {instrument_symbol}")

@@ -8,33 +8,26 @@ from technical_analysis.utils import SingletonMeta
 
 class ResponseCacherComponent(metaclass=SingletonMeta):
     """
-    A component to interact with the server's file system
+    A component to cache API responses of APIs 
     """
 
     RESPONSE_CACHE_DIR: str = os.path.join(os.getcwd(), "response_cache")
     CACHE_THRESHOLD_PERIOD: datetime.timedelta = datetime.timedelta(days=5)
 
 
-    def __init__(
-        self,
-        cache_threshold_period_days: int = 5
-    ):
-        ResponseCacherComponent.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
+    def __init__(self):
+        pass
 
 
-    @classmethod
-    def get_cache_threshold_period(cls) -> datetime.timedelta:
-        return cls.CACHE_THRESHOLD_PERIOD
-    
+    def get_cache_threshold_period(self) -> datetime.timedelta:
+        return self.CACHE_THRESHOLD_PERIOD
 
-    @classmethod
-    def set_cache_threshold_period(cls, cache_threshold_period_days: int) -> None:
-        cls.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
+    def set_cache_threshold_period(self, cache_threshold_period_days: int) -> None:
+        self.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
 
 
-    @classmethod
     def cache_response_data(
-        cls,
+        self,
         which_api: AlphaVantageEnum | IndianAPIEnum,
         which_instrument: str,
         response_data: dict,
@@ -53,7 +46,7 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        response_file_path = os.path.join(cls.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        response_file_path = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         os.makedirs(os.path.dirname(response_file_path), exist_ok=True)
         with open(response_file_path, 'w') as f:
@@ -61,10 +54,9 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
 
         print(f"[INFO] Cached response data at {response_file_path}")
 
-    
-    @classmethod
+
     def is_response_data_cached(
-        cls,
+        self,
         which_api: AlphaVantageEnum | IndianAPIEnum,
         which_instrument: str
     ) -> bool:
@@ -82,19 +74,18 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        response_file_path = os.path.join(cls.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        response_file_path = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         if not os.path.exists(response_file_path):
             return False
         
         modified_time: float = os.path.getmtime(response_file_path)
         time_elapsed_since_last_modification = datetime.timedelta(seconds=(time.time() - modified_time))
-        return time_elapsed_since_last_modification <= cls.CACHE_THRESHOLD_PERIOD
+        return time_elapsed_since_last_modification <= self.CACHE_THRESHOLD_PERIOD
             
 
-    @classmethod
     def retrieve_from_cache(
-        cls,
+        self,
         which_api: AlphaVantageEnum | IndianAPIEnum,
         which_instrument: str
     ) -> dict | None:
@@ -108,7 +99,7 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
         Returns:
             dict | None: api_response.json() if cached, None otherwise
         """
-        if not cls.is_response_data_cached(which_api, which_instrument):
+        if not self.is_response_data_cached(which_api, which_instrument):
             print(f"[INFO] {which_api.value} API data is not cached...")
             return
         
@@ -116,7 +107,7 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        retrieval_file_path: str = os.path.join(cls.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        retrieval_file_path: str = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         cached_instrument: dict = {}
         with open(retrieval_file_path, 'r') as f:

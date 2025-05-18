@@ -1,8 +1,15 @@
-from technical_analysis.components.alpha_vantage.data_store_component import DataStoreComponent
-from technical_analysis.components import StockMetricVisualisationComponent, StockTechnicalIndicationComponent, PriceCharterComponent
+from technical_analysis.components.alpha_vantage import DataStoreComponent
+from technical_analysis.components import StockMetricVisualisationComponent, StockTechnicalIndicationComponent, PriceCharterComponent, ResponseCacherComponent
 from technical_analysis.models import CandlespanEnum, OHLCVEnum
 
 if __name__ == "__main__":
+
+    """
+    Setup cache outdation threshold period
+    """
+    ResponseCacherComponent().set_cache_threshold_period(5)
+    print(f"API Response Cache threshold period set to {ResponseCacherComponent().get_cache_threshold_period()} days")
+
 
     """
     Setup data
@@ -10,7 +17,6 @@ if __name__ == "__main__":
     metric: OHLCVEnum = OHLCVEnum.CLOSE
     candle_span: CandlespanEnum = CandlespanEnum.MONTHLY
     na_strategy: str = 'backfill'
-    use_api_cache_when_applicable: bool = True
 
     # Uncomment below line for all valid instrument symbols
     instrument_symbols: list[str] = ['RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE']
@@ -22,8 +28,7 @@ if __name__ == "__main__":
         metric=metric, 
         candle_span=candle_span, 
         instrument_symbols=instrument_symbols,
-        na_strategy=na_strategy,
-        use_api_cache_when_applicable=use_api_cache_when_applicable
+        na_strategy=na_strategy
     )
 
 
