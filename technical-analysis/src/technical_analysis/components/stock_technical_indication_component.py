@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from technical_analysis.components.alpha_vantage import DataStoreComponent
+from technical_analysis.components.price_charter_component import PriceCharterComponent
 from technical_analysis.models import OHLCVEnum
 
 
@@ -84,10 +85,10 @@ class StockTechnicalIndicationComponent:
         :return: self
         :rtype: StockTechnicalIndicationComponent
         """
-        self.__df['fast_ema']       = self.__df[self.data_store.metric].ewm(span=fast_period, adjust=False).mean()
-        self.__df['slow_ema']       = self.__df[self.data_store.metric].ewm(span=slow_period, adjust=False).mean()
+        self.__df['fast_ema']       = self.__df[self.data_store.metric].ewm(span=fast_period, min_periods=fast_period, adjust=False).mean()
+        self.__df['slow_ema']       = self.__df[self.data_store.metric].ewm(span=slow_period, min_periods=slow_period, adjust=False).mean()
         self.__df['macd']           = self.__df['fast_ema'] - self.__df['slow_ema']
-        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period).mean()
+        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period, min_periods=signal_period).mean()
         self.__df['macd_histogram'] = self.__df['macd'] - self.__df['macd_signal']
 
         self.__df.drop(columns=['fast_ema', 'slow_ema'], inplace=True)
@@ -116,7 +117,7 @@ class StockTechnicalIndicationComponent:
         self.__df["H-PC"]   = (self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
         self.__df["L-PC"]   = (self.__df[OHLCVEnum.LOW.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
         self.__df["TR"]     = self.__df[["H-L", "H-PC", "L-PC"]].max(axis='columns', skipna=False)
-        self.__df["atr"]    = self.__df["TR"].ewm(span=window).mean()
+        self.__df["atr"]    = self.__df["TR"].ewm(span=window, min_periods=window).mean()
 
         self.__df.drop(columns=["H-L", "H-PC", "L-PC", "TR"], inplace=True)
 
@@ -174,8 +175,8 @@ class StockTechnicalIndicationComponent:
         self.__df['close_change']   = self.__df[OHLCVEnum.CLOSE.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)
         self.__df['gain']           = self.__df['close_change'].apply(lambda x: x if x >= 0 else 0.0)
         self.__df['loss']           = self.__df['close_change'].apply(lambda x: -x if x < 0 else 0.0)
-        self.__df['avg_gain']       = self.__df['gain'].ewm(alpha=(1/window)).mean()
-        self.__df['avg_loss']       = self.__df['loss'].ewm(alpha=(1/window)).mean()
+        self.__df['avg_gain']       = self.__df['gain'].ewm(alpha=(1/window), min_periods=window).mean()
+        self.__df['avg_loss']       = self.__df['loss'].ewm(alpha=(1/window), min_periods=window).mean()
         self.__df['rs']             = self.__df['avg_gain'] / self.__df['avg_loss']
         self.__df['rsi']            = 100 - (100 / ( 1 + self.__df['rs']))
 
@@ -217,12 +218,12 @@ class StockTechnicalIndicationComponent:
         self.__df['dm_up']      = self.__df[['hh','ll']].apply(lambda row: max(row['hh'], 0) if row['hh'] > row['ll'] else 0, axis='columns')
         self.__df['dm_down']    = self.__df[['hh','ll']].apply(lambda row: max(row['ll'], 0) if row['ll'] > row['hh'] else 0, axis='columns')
 
-        self.__df['di_up']      = (100/self.__df['atr']) * self.__df['dm_up'].ewm(alpha=(1/window)).mean()
-        self.__df['di_down']    = (100/self.__df['atr']) * self.__df['dm_down'].ewm(alpha=(1/window)).mean()
+        self.__df['di_up']      = (100/self.__df['atr']) * self.__df['dm_up'].ewm(alpha=(1/window), min_periods=window).mean()
+        self.__df['di_down']    = (100/self.__df['atr']) * self.__df['dm_down'].ewm(alpha=(1/window), min_periods=window).mean()
 
         self.__df['dx']         = ((self.__df['di_up'] - self.__df['di_down']) / (self.__df['di_up'] + self.__df['di_down'])).abs()
 
-        self.__df['adx']        = 100 * self.__df['dx'].ewm(alpha=(1/window)).mean()
+        self.__df['adx']        = 100 * self.__df['dx'].ewm(alpha=(1/window), min_periods=window).mean()
 
         self.__df.drop(columns=['hh', 'll', 'dm_up', 'dm_down', 'di_up', 'di_down', 'dx'], inplace=True)
         if not do_not_delete_atr_post_calculation:
@@ -230,38 +231,6 @@ class StockTechnicalIndicationComponent:
         
         return self
     
-
-    def plot_main_metric(
-        self,
-        title: str | None = None,
-        styling: str = 'ggplot'
-    ) -> None:
-        """
-        Plot the main metric line graph for the configured instrument symbol.
-
-        :param title: The title of the plot.
-        :type title: str | None
-
-        :param styling: The styling of the plot. Default is 'ggplot'.
-        :type styling: str
-        
-        :return: None
-        :rtype: None
-        """
-        plt.style.use(styling)
-
-        fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
-
-        self.__subplot_main_metric(ax1)
-
-        ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d-%m-%Y'))
-        fig.autofmt_xdate(rotation=70)
-
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.show()
-
 
     def plot_macd(
         self,
@@ -290,7 +259,11 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        self.__subplot_main_metric(ax1)
+        # TODO: Remove plotting of price line graph after UI is implemented
+        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        ax1.set_title("Prices")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
 
         ax2.plot(self.__df.index, self.__df['macd'], label='MACD', color='blue')
         ax2.plot(self.__df.index, self.__df['macd_signal'], label='Signal Line', color='red')
@@ -338,7 +311,11 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        self.__subplot_main_metric(ax1)
+        # TODO: Remove plotting of price line graph after UI is implemented
+        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        ax1.set_title("Prices")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
 
         ax2.plot(self.__df.index, self.__df['atr'], label='ATR', color='blue')
         ax2.set_title(f"ATR Line")
@@ -388,11 +365,14 @@ class StockTechnicalIndicationComponent:
         
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        self.__subplot_main_metric(ax1)
+        # TODO: Remove plotting of price line graph after UI is implemented
+        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
 
         ax1.plot(self.__df.index, self.__df['middle_boll_band'], label='Middle Band', color='blue')
         ax1.plot(self.__df.index, self.__df['upper_boll_band'], label='Upper Band', color='red')
         ax1.plot(self.__df.index, self.__df['lower_boll_band'], label='Lower Band', color='green')
+        ax1.set_title("Prices")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(True)
 
         if ax2:
@@ -437,7 +417,11 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        self.__subplot_main_metric(ax1)
+        # TODO: Remove plotting of price line graph after UI is implemented
+        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        ax1.set_title("Prices")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
 
         ax2.plot(self.__df.index, self.__df['rsi'], label='RSI', color='green')
         ax2.plot(self.__df.index, np.repeat([70], self.__df.index.size), color='purple')
@@ -480,7 +464,11 @@ class StockTechnicalIndicationComponent:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
 
-        self.__subplot_main_metric(ax1)
+        # TODO: Remove plotting of price line graph after UI is implemented
+        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        ax1.set_title("Prices")
+        ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
+        ax1.legend().set_visible(False)
 
         ax2.plot(self.__df.index, self.__df['adx'], label='ADX', color='blue')
         ax2.plot(self.__df.index, np.repeat([25], self.__df.index.size), color='purple')
@@ -495,26 +483,3 @@ class StockTechnicalIndicationComponent:
 
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
-
-
-    def __subplot_main_metric(
-        self,
-        ax: plt.Axes
-    ) -> None:
-        """
-        Subplots the main metric line graph in the given plt.Axes
-
-        :param ax: The axes along which to plot
-        :type ax: plt.Axes
-
-        :return: None
-        :rtype: None
-
-        Note: Does not show the plot, that is the responsibility of the plot method that calls this subplot method
-        """
-        main_df = self.data_store.main_metric_df
-
-        ax.plot(main_df.index, main_df.loc[:, self.__instrument_symbol], label=self.data_store.metric.lower(), linestyle='-', color='black', alpha=0.6)
-        ax.set_title(f"{self.data_store.metric.capitalize()}s")
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
-        ax.legend().set_visible(False)

@@ -149,6 +149,10 @@ class DataStoreComponent:
         return self.instrument_ohlcvdf_dict.get(instrument_symbol)
 
 
+    def get_renko_df(self, instrument_symbol: str) -> pd.DataFrame | None:
+        pass
+
+
     def get_simple_moving_operation_df(
         self, 
         on_which_df: Literal['main_metric', 'change_in_main_metric'],
