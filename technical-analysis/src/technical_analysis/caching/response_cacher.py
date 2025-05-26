@@ -3,12 +3,13 @@ import os
 import json
 import time
 
-from technical_analysis.models import AlphaVantageEnum, IndianAPIEnum
-from technical_analysis.utils import SingletonMeta
+from technical_analysis.enums.api import APIEnum
+from technical_analysis.utils.singleton import SingletonMeta
 
-class ResponseCacherComponent(metaclass=SingletonMeta):
+
+class ResponseCacher(metaclass=SingletonMeta):
     """
-    A component to cache API responses of APIs 
+    A component to cache API responses of APIs
     """
 
     RESPONSE_CACHE_DIR: str = os.path.join(os.getcwd(), "response_cache")
@@ -28,7 +29,7 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
 
     def cache_response_data(
         self,
-        which_api: AlphaVantageEnum | IndianAPIEnum,
+        which_api: APIEnum,
         which_instrument: str,
         response_data: dict,
         indent: int = 4
@@ -37,7 +38,7 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
         Writes response data into a json file
 
         Args:
-            which_api(AlphaVantageEnum | IndianAPIEnum): The response is from which API
+            which_api(APIEnum): The response is from which API
             which_instrument(str): Which istrument's api_response is being stored
             response_data(dict): api_response.json()
             indent(int): json file indent number, defaults to 4
@@ -57,14 +58,14 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
 
     def is_response_data_cached(
         self,
-        which_api: AlphaVantageEnum | IndianAPIEnum,
+        which_api: APIEnum,
         which_instrument: str
     ) -> bool:
         """
         Checks if given api response data is already present in the response cache directory
 
         Args:
-            which_api(AlphaVantageEnum | IndianAPIEnum): The response from which API is to be searched
+            which_api(APIEnum): The response from which API is to be searched
             which_instrument(str): Which istrument's api_response is being searched
 
         Returns:
@@ -86,14 +87,14 @@ class ResponseCacherComponent(metaclass=SingletonMeta):
 
     def retrieve_from_cache(
         self,
-        which_api: AlphaVantageEnum | IndianAPIEnum,
+        which_api: APIEnum,
         which_instrument: str
     ) -> dict | None:
         """
         Retrieves a given response data if it is already present in the response cache directory
 
         Args:
-            which_api(AlphaVantageEnum | IndianAPIEnum): The response from which API is to be searched
+            which_api(APIEnum): The response from which API is to be searched
             which_instrument(str): Which istrument's api_response is being searched
 
         Returns:

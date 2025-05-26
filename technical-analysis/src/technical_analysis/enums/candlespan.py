@@ -1,4 +1,5 @@
-from technical_analysis.utils import EnumWithValuesList
+from technical_analysis.utils.enum_helpers import EnumWithValuesList
+
 
 class CandlespanEnum(EnumWithValuesList):
     DAILY = "DAILY"

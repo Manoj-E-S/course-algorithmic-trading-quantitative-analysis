@@ -1,4 +1,6 @@
-from technical_analysis.utils import EnumWithValuesList
+from typing import Union
+
+from technical_analysis.utils.enum_helpers import EnumWithValuesList
 
 
 class AlphaVantageEnum(EnumWithValuesList):
@@ -10,3 +12,9 @@ class AlphaVantageEnum(EnumWithValuesList):
 class IndianAPIEnum(EnumWithValuesList):
     STOCK_DETAILS = "indian_api.stock_details"
     HISTORICAL_DATA = "indian_api.historical_data"
+
+
+APIEnum = Union[
+    AlphaVantageEnum,
+    IndianAPIEnum
+]

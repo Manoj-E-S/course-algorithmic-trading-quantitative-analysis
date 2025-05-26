@@ -1,50 +1,44 @@
 from typing import Literal
+
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator
-from technical_analysis.components.alpha_vantage import DataStoreComponent
-from technical_analysis.models.ohlcv_enum import OHLCVEnum
+
+from technical_analysis.enums.ohlcvud import OHLCVUDEnum
+from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.renko import Renko
 
 
-class PriceCharterComponent:
+class InstrumentCharter:
     """
-    A component to plot the price chart of a stock in dfferent formats
+    A component to plot the price/volume charts of an instrument in different formats
     """
 
     def __init__(
         self,
-        instrument_symbol: str,
-        financial_data_store: DataStoreComponent
+        source_instrument: Candlesticks | Renko
     ):
-        self.__store: DataStoreComponent = financial_data_store
-
-        if not self.__store.is_instrument_valid(instrument_symbol):
-            print(f"[ERROR] {self.__class__.__name__} class Initialization Error")
-            error_message: str = f"Instrument {instrument_symbol} is invalid"
-            raise ValueError(error_message)
-    
-        self.__instrument_symbol: str = instrument_symbol
+        if not isinstance(source_instrument, (Candlesticks, Renko)):
+            raise TypeError("source_instrument must be an instance of Candlesticks or Renko.")
+        
+        self.__source_instrument: Candlesticks | Renko = source_instrument
+        self.__df = source_instrument.get_candlesticks() if isinstance(source_instrument, Candlesticks) else source_instrument.get_renko()
 
 
     # Getters
     @property
-    def data_store(self) -> DataStoreComponent:
-        return self.__store
-    
+    def source_instrument(self) -> Candlesticks | Renko:
+        return self.__source_instrument
+
     @property
     def instrument_symbol(self) -> str:
-        return self.__instrument_symbol
+        return self.__source_instrument.instrument_symbol
     
 
     # Chainable Setters
-    @data_store.setter
-    def data_store(self, data_store: DataStoreComponent) -> 'PriceCharterComponent':
-        self.__store = data_store
-        return self
-    
-    @instrument_symbol.setter
-    def instrument_symbol(self, instrument_symbol: str) -> 'PriceCharterComponent':
-        self.__instrument_symbol = instrument_symbol
+    @source_instrument.setter
+    def source_instrument(self, source_instrument: Candlesticks | Renko) -> 'InstrumentCharter':
+        self.__source_instrument = source_instrument
         return self
     
 
@@ -67,10 +61,13 @@ class PriceCharterComponent:
         """
         plt.style.use(styling)
 
-        fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
 
-        self.subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+
+        self.subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -102,8 +99,11 @@ class PriceCharterComponent:
         """
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
+
         fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         self.subplot_volume(ax1)
         ax1.set_title("Volumes")
@@ -121,7 +121,7 @@ class PriceCharterComponent:
     def subplot_ohlc(
         self,
         ax: plt.Axes,
-        metric: Literal[OHLCVEnum.CLOSE, OHLCVEnum.OPEN, OHLCVEnum.HIGH, OHLCVEnum.LOW] = OHLCVEnum.CLOSE
+        metric: Literal[OHLCVUDEnum.CLOSE, OHLCVUDEnum.OPEN, OHLCVUDEnum.HIGH, OHLCVUDEnum.LOW] = OHLCVUDEnum.CLOSE
     ) -> None:
         """
         Subplots the OHLC line graph in the given plt.Axes
@@ -129,8 +129,8 @@ class PriceCharterComponent:
         :param ax: The axes along which to plot
         :type ax: plt.Axes
 
-        :param metric: O, H, L, or C of the OHLCVEnum type; Defaults to C
-        :type metric: Literal[OHLCVEnum.CLOSE, OHLCVEnum.OPEN, OHLCVEnum.HIGH, OHLCVEnum.LOW]
+        :param metric: O, H, L, or C of the OHLCVUDEnum type; Defaults to C
+        :type metric: Literal[OHLCVUDEnum.CLOSE, OHLCVUDEnum.OPEN, OHLCVUDEnum.HIGH, OHLCVUDEnum.LOW]
 
         :return: None
         :rtype: None
@@ -141,10 +141,10 @@ class PriceCharterComponent:
         1. Does not show the plot. That is the responsibility of the plot method that calls this subplot method
         2. Hides the legend since it only plots one line for the (ohlc) price. The plot method calling this method can handle the legend visibility based on need
         """
-        if metric.value not in OHLCVEnum.price_values():
+        if metric.value not in OHLCVUDEnum.price_values():
             raise ValueError(f"Unsupported Metric {metric.value} for ohlc line plot")
         
-        metric_series = self.data_store.get_ohlcv_df_for_instrument(self.__instrument_symbol)[metric.value]
+        metric_series = self.__df[metric.value]
         ax.plot(metric_series.index, metric_series.values, label=f'{metric.value.capitalize()} prices', linestyle='-', color='black', alpha=0.6)
 
 
@@ -164,5 +164,5 @@ class PriceCharterComponent:
         Note: 
         1. Does not show the plot, that is the responsibility of the plot method that calls this subplot method
         """
-        volume_series = self.data_store.get_ohlcv_df_for_instrument(self.__instrument_symbol)[OHLCVEnum.VOLUME.value]
-        ax.bar(volume_series.index, volume_series.values, 35.0, label=OHLCVEnum.VOLUME.value.lower(), linestyle='-', color='gray', alpha=0.5)
+        volume_series = self.__df[OHLCVUDEnum.VOLUME.value]
+        ax.bar(volume_series.index, volume_series.values, 35.0, label=OHLCVUDEnum.VOLUME.value.lower(), linestyle='-', color='gray', alpha=0.5)

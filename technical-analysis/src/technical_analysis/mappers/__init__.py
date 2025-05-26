@@ -1,2 +1,0 @@
-from technical_analysis.mappers.candlespan_mapper import CandlespanMappers
-from technical_analysis.mappers.alpha_vantage import ToTimeSeriesJsonKeyMappers

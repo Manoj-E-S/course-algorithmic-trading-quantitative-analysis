@@ -1,61 +1,58 @@
+import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator
-import numpy as np
+
 import pandas as pd
 
-from technical_analysis.components.alpha_vantage import DataStoreComponent
-from technical_analysis.components.price_charter_component import PriceCharterComponent
-from technical_analysis.models import OHLCVEnum
+from technical_analysis.enums.ohlcvud import OHLCVUDEnum
+from technical_analysis.indicators.indicator_calculator import IndicatorCalculator
+from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.renko import Renko
 
 
-class StockTechnicalIndicationComponent:
+class TechniCharter:
     """
     A class to represent all technical indicators.
     This class is responsible for providing technical indicators on the data store's instrument it is configured with.
     """
+
     def __init__(
         self,
-        financial_data_store: DataStoreComponent,
-        instrument_symbol: str
+        source_instrument: Candlesticks | Renko
     ):
-        self.__store: DataStoreComponent = financial_data_store
+        if not isinstance(source_instrument, (Candlesticks, Renko)):
+            raise TypeError("source_instrument must be an instance of Candlesticks or Renko.")
 
-        if not self.__store.is_instrument_valid(instrument_symbol):
-            print(f"[ERROR] {self.__class__.__name__} class Initialization Error")
-            error_message: str = f"Instrument {instrument_symbol} is invalid"
-            raise ValueError(error_message)
+        self.__source_instrument: Candlesticks | Renko = source_instrument
+        self.__df = source_instrument.get_candlesticks() if isinstance(source_instrument, Candlesticks) else source_instrument.get_renko()
 
-        self.__instrument_symbol: str = instrument_symbol
-        self.__df: pd.DataFrame = self.__store.instrument_ohlcvdf_dict.get(self.__instrument_symbol)
-    
 
     # Getters
     @property
-    def data_store(self) -> DataStoreComponent:
-        return self.__store
-    
+    def source_instrument(self) -> Candlesticks | Renko:
+        return self.__source_instrument
+
     @property
     def instrument_symbol(self) -> str:
-        return self.__instrument_symbol
+        return self.__source_instrument.instrument_symbol
     
 
     # Chainable Setters
-    @data_store.setter
-    def data_store(self, data_store: DataStoreComponent) -> 'StockTechnicalIndicationComponent':
-        self.__store = data_store
-        return self
-    
-    @instrument_symbol.setter
-    def instrument_symbol(self, instrument_symbol: str) -> 'StockTechnicalIndicationComponent':
-        self.__instrument_symbol = instrument_symbol
+    @source_instrument.setter
+    def source_instrument(self, source_instrument: Candlesticks | Renko) -> 'TechniCharter':
+        self.__source_instrument = source_instrument
         return self
 
 
-    # Methods
-    def collect(self) -> pd.DataFrame:
+    # Public Methods
+    def collect_as_dataframe(self) -> pd.DataFrame:
         """
-        Returns the dataframe with OHLCV columns and indicator columns (if any) for the associated instrument from the associated store.
+        Returns the dataframe (with all the technical indicators if calculated).
+        
+        :return: The dataframe with all the technical indicators if calculated.
+        :rtype: pd.DataFrame
         """
         return self.__df
     
@@ -65,7 +62,7 @@ class StockTechnicalIndicationComponent:
         fast_period: int = 12,
         slow_period: int = 26,
         signal_period: int = 9
-    ) -> 'StockTechnicalIndicationComponent':
+    ) -> 'TechniCharter':
         """
         Calculate the MACD (Moving Average Convergence Divergence) for the configured instrument symbol, and include it in the dataframe.
         
@@ -83,23 +80,16 @@ class StockTechnicalIndicationComponent:
         :type signal_period: int
 
         :return: self
-        :rtype: StockTechnicalIndicationComponent
+        :rtype: TechniCharter
         """
-        self.__df['fast_ema']       = self.__df[self.data_store.metric].ewm(span=fast_period, min_periods=fast_period, adjust=False).mean()
-        self.__df['slow_ema']       = self.__df[self.data_store.metric].ewm(span=slow_period, min_periods=slow_period, adjust=False).mean()
-        self.__df['macd']           = self.__df['fast_ema'] - self.__df['slow_ema']
-        self.__df['macd_signal']    = self.__df['macd'].ewm(span=signal_period, min_periods=signal_period).mean()
-        self.__df['macd_histogram'] = self.__df['macd'] - self.__df['macd_signal']
-
-        self.__df.drop(columns=['fast_ema', 'slow_ema'], inplace=True)
-        
+        self.__df = IndicatorCalculator.macd(self.__df, fast_period, slow_period, signal_period)
         return self
     
 
     def atr(
         self,
         window: int = 14
-    ) -> 'StockTechnicalIndicationComponent':
+    ) -> 'TechniCharter':
         """
         Calculate the ATR (Average true Range) for the configured instrument symbol, and include it in the dataframe.
         
@@ -111,23 +101,16 @@ class StockTechnicalIndicationComponent:
         :type window: int
 
         :return: self
-        :rtype: StockTechnicalIndicationComponent
+        :rtype: TechniCharter
         """
-        self.__df["H-L"]    = self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.LOW.value]
-        self.__df["H-PC"]   = (self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
-        self.__df["L-PC"]   = (self.__df[OHLCVEnum.LOW.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)).abs()
-        self.__df["TR"]     = self.__df[["H-L", "H-PC", "L-PC"]].max(axis='columns', skipna=False)
-        self.__df["atr"]    = self.__df["TR"].ewm(span=window, min_periods=window).mean()
-
-        self.__df.drop(columns=["H-L", "H-PC", "L-PC", "TR"], inplace=True)
-
+        self.__df = IndicatorCalculator.atr(self.__df, window)
         return self
     
 
     def bollinger_bands(
         self,
         window: int = 20
-    ) -> 'StockTechnicalIndicationComponent':
+    ) -> 'TechniCharter':
         """
         Calculate the Bollinger band data for the configured instrument symbol, and include it in the dataframe.
         
@@ -140,20 +123,16 @@ class StockTechnicalIndicationComponent:
         :type window: int
 
         :return: self
-        :rtype: StockTechnicalIndicationComponent
+        :rtype: TechniCharter
         """
-        self.__df["middle_boll_band"]   = self.__df[OHLCVEnum.CLOSE.value].rolling(window).mean()
-        self.__df["upper_boll_band"]    = self.__df["middle_boll_band"] + 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
-        self.__df["lower_boll_band"]    = self.__df["middle_boll_band"] - 2 * self.__df[OHLCVEnum.CLOSE.value].rolling(window).std(ddof=0)
-        self.__df["band_width"]         = self.__df["upper_boll_band"] - self.__df["lower_boll_band"]
-
+        self.__df = IndicatorCalculator.bollinger_bands(self.__df, window)
         return self
     
 
     def rsi(
         self,
         window: int = 14
-    ) -> 'StockTechnicalIndicationComponent':
+    ) -> 'TechniCharter':
         """
         Calculate the RSI (Relative Strength Index) for the configured instrument symbol, and include it in the dataframe.
         
@@ -170,25 +149,16 @@ class StockTechnicalIndicationComponent:
         :type window: int
 
         :return: self
-        :rtype: StockTechnicalIndicationComponent
+        :rtype: TechniCharter
         """
-        self.__df['close_change']   = self.__df[OHLCVEnum.CLOSE.value] - self.__df[OHLCVEnum.CLOSE.value].shift(1)
-        self.__df['gain']           = self.__df['close_change'].apply(lambda x: x if x >= 0 else 0.0)
-        self.__df['loss']           = self.__df['close_change'].apply(lambda x: -x if x < 0 else 0.0)
-        self.__df['avg_gain']       = self.__df['gain'].ewm(alpha=(1/window), min_periods=window).mean()
-        self.__df['avg_loss']       = self.__df['loss'].ewm(alpha=(1/window), min_periods=window).mean()
-        self.__df['rs']             = self.__df['avg_gain'] / self.__df['avg_loss']
-        self.__df['rsi']            = 100 - (100 / ( 1 + self.__df['rs']))
-
-        self.__df.drop(columns=['close_change', 'gain', 'loss', 'avg_gain', 'avg_loss', 'rs'], inplace=True)
-        
+        self.__df = IndicatorCalculator.rsi(self.__df, window)
         return self
     
 
     def adx(
         self,
         window: int = 14
-    ) -> 'StockTechnicalIndicationComponent':
+    ) -> 'TechniCharter':
         """
         Calculate the ADX (Average Directional Index) for the configured instrument symbol, and include it in the dataframe.
         
@@ -204,31 +174,9 @@ class StockTechnicalIndicationComponent:
         :type window: int
 
         :return: self
-        :rtype: StockTechnicalIndicationComponent
+        :rtype: TechniCharter
         """
-        do_not_delete_atr_post_calculation: bool = False
-        if 'atr' in self.__df.columns:
-            do_not_delete_atr_post_calculation = True
-        else:
-            self.atr()
-        
-        self.__df['hh']         = self.__df[OHLCVEnum.HIGH.value] - self.__df[OHLCVEnum.HIGH.value].shift(1)
-        self.__df['ll']         = self.__df[OHLCVEnum.LOW.value].shift(1) - self.__df[OHLCVEnum.LOW.value]
-
-        self.__df['dm_up']      = self.__df[['hh','ll']].apply(lambda row: max(row['hh'], 0) if row['hh'] > row['ll'] else 0, axis='columns')
-        self.__df['dm_down']    = self.__df[['hh','ll']].apply(lambda row: max(row['ll'], 0) if row['ll'] > row['hh'] else 0, axis='columns')
-
-        self.__df['di_up']      = (100/self.__df['atr']) * self.__df['dm_up'].ewm(alpha=(1/window), min_periods=window).mean()
-        self.__df['di_down']    = (100/self.__df['atr']) * self.__df['dm_down'].ewm(alpha=(1/window), min_periods=window).mean()
-
-        self.__df['dx']         = ((self.__df['di_up'] - self.__df['di_down']) / (self.__df['di_up'] + self.__df['di_down'])).abs()
-
-        self.__df['adx']        = 100 * self.__df['dx'].ewm(alpha=(1/window), min_periods=window).mean()
-
-        self.__df.drop(columns=['hh', 'll', 'dm_up', 'dm_down', 'di_up', 'di_down', 'dx'], inplace=True)
-        if not do_not_delete_atr_post_calculation:
-            self.__df.drop(columns=['atr'], inplace=True)
-        
+        self.__df = IndicatorCalculator.adx(self.__df, window)
         return self
     
 
@@ -252,15 +200,21 @@ class StockTechnicalIndicationComponent:
         :raises ValueError: If the MACD is not calculated yet.
         """
         if 'macd' not in self.__df.columns or 'macd_signal' not in self.__df.columns or 'macd_histogram' not in self.__df.columns:
-            raise ValueError("MACD not calculated yet. Please call the macd() method before plotting.")
+            self.macd()
         
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
+        ax2: plt.Axes = None
+        ax3: plt.Axes = None
+
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1, 1]})
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
-        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        from technical_analysis.visualization.uni_instrument import InstrumentCharter
+        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -304,15 +258,20 @@ class StockTechnicalIndicationComponent:
         :raises ValueError: If the ATR is not calculated yet.
         """
         if 'atr' not in self.__df.columns:
-            raise ValueError("ATR not calculated yet. Please call the atr() method before plotting.")
+            self.atr()
         
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
+        ax2: plt.Axes = None
+
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
-        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        from technical_analysis.visualization.uni_instrument import InstrumentCharter
+        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -353,20 +312,24 @@ class StockTechnicalIndicationComponent:
         :raises ValueError: If the Bollinger Bands data is not calculated yet.
         """
         if 'middle_boll_band' not in self.__df.columns or 'upper_boll_band' not in self.__df.columns or 'lower_boll_band' not in self.__df.columns or 'band_width' not in self.__df.columns:
-            raise ValueError("Bollinger Bands not calculated yet. Please call the bollinger_bands() method before plotting.")
+            self.bollinger_bands()
         
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
         ax2: plt.Axes = None
+
         if should_plot_band_width:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         else:
             fig, ax1 = plt.subplots(1, 1, figsize=(14, 8))
         
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
-        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        from technical_analysis.visualization.uni_instrument import InstrumentCharter
+        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
 
         ax1.plot(self.__df.index, self.__df['middle_boll_band'], label='Middle Band', color='blue')
         ax1.plot(self.__df.index, self.__df['upper_boll_band'], label='Upper Band', color='red')
@@ -410,15 +373,20 @@ class StockTechnicalIndicationComponent:
         :raises ValueError: If the RSI is not calculated yet.
         """
         if 'rsi' not in self.__df.columns:
-            raise ValueError("RSI not calculated yet. Please call the rsi() method before plotting.")
-        
+            self.rsi()
+
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
+        ax2: plt.Axes = None
+
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
-        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        from technical_analysis.visualization.uni_instrument import InstrumentCharter
+        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -457,15 +425,20 @@ class StockTechnicalIndicationComponent:
         :raises ValueError: If the ADX is not calculated yet.
         """
         if 'adx' not in self.__df.columns:
-            raise ValueError("ADX not calculated yet. Please call the adx() method before plotting.")
+            self.adx()
         
         plt.style.use(styling)
 
+        fig: plt.Figure = None
+        ax1: plt.Axes = None
+        ax2: plt.Axes = None
+
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.__instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
-        PriceCharterComponent(self.instrument_symbol, self.data_store).subplot_ohlc(ax1, OHLCVEnum.CLOSE)
+        from technical_analysis.visualization.uni_instrument import InstrumentCharter
+        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)

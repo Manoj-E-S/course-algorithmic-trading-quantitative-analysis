@@ -1,10 +1,12 @@
 from typing import Literal
 
 import requests
-from technical_analysis.services.alpha_vantage._alpha_vantage_validation_service import AlphaVantageValidationService
-from technical_analysis.services.alpha_vantage._endpoints_service import EndpointsService
-from technical_analysis.services.alpha_vantage._auth_service import AuthService
+
 from technical_analysis.services._validation_service import ValidationService
+from technical_analysis.services.alpha_vantage._specific_validation_service import AlphaVantageSpecificValidationService
+from technical_analysis.services.alpha_vantage._auth_service import AuthService
+from technical_analysis.services.alpha_vantage._endpoints_service import EndpointsService
+
 
 class TimeSeriesService:
     """
@@ -58,13 +60,13 @@ class TimeSeriesService:
             return
         
         response_json: dict = response.json()
-        if AlphaVantageValidationService.does_response_json_have_error_message(response_json):
+        if AlphaVantageSpecificValidationService.does_response_json_have_error_message(response_json):
             print(f"\n[ERROR] Alpha Vantage API Error for instrument {symbol}")
             print("[ERROR] Error Details:")
             print(f"{response_json}\n")
             return
 
-        if AlphaVantageValidationService.does_response_json_have_api_limit_message(response_json):
+        if AlphaVantageSpecificValidationService.does_response_json_have_api_limit_message(response_json):
             print("[ERROR] Alpha Vantage API Request Limit Error")
             return
 

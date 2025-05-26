@@ -1,4 +1,4 @@
-class AlphaVantageValidationService:
+class AlphaVantageSpecificValidationService:
     """
     A Class to validate API responses specific to alpha vantage api.
 

@@ -1,2 +1,0 @@
-from technical_analysis.services.indian_api.stock_detail_service import StockDetailService
-from technical_analysis.services.indian_api.historical_data_service import HistoricalDataService
