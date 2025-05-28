@@ -1,8 +1,11 @@
 from technical_analysis.utils.enum_helpers import EnumWithValuesList
 
 
-class ApiDataframingServiceEnum(EnumWithValuesList):
-
+class ApiSourceEnum(EnumWithValuesList):
+    """
+    Enum to provide the source of API data for various modules in the technical analysis package.
+    The class of each api's dataframing service (aka the api data source) is stored as values.
+    """
     from technical_analysis.services.base_api_dataframing_service import BaseApiDataframingService
 
     # Alpha Vantage API Dataframing Service

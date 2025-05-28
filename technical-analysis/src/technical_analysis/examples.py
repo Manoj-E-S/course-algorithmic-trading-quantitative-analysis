@@ -1,9 +1,9 @@
 from technical_analysis.visualization.uni_instrument import InstrumentCharter
 from technical_analysis.visualization.multi_instrument import InstrumentGroupVisualizer
 from technical_analysis.caching.response_cacher import ResponseCacher
-from technical_analysis.indicators.technichart import TechniCharter
+from technical_analysis.visualization.technical_indicators import TechniCharter
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.api_dataframing import ApiDataframingServiceEnum
+from technical_analysis.enums.api_source import ApiSourceEnum
 from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument_group import InstrumentGroup
 from technical_analysis.models.renko import Renko
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     Setup data
     """
     # main_metric: OHLCVUDEnum = OHLCVUDEnum.CLOSE
-    candle_span: CandlespanEnum = CandlespanEnum.WEEKLY
+    candle_span: CandlespanEnum = CandlespanEnum.DAILY
     na_strategy: str = 'backfill'
 
     # Uncomment below line for all valid instrument symbols
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     daily_indian_instruments_group: InstrumentGroup = InstrumentGroup(
         instrument_symbols=instrument_symbols,
         candle_span=candle_span,
-        source_api_class_for_dataframing=ApiDataframingServiceEnum.ALPHA_VANTAGE,
+        api_source=ApiSourceEnum.ALPHA_VANTAGE,
         na_strategy=na_strategy
     )
 
@@ -73,6 +73,10 @@ if __name__ == "__main__":
     #         window=10
     #     )
     # )
+    
+    # # KPIs
+    # print(f"CAGR for all instruments in the group:\n{daily_indian_instruments_group.cagrs}")
+
 
     """
     Uncomment the following lines to see the usage of InstrumentGroupVisualizer
@@ -111,29 +115,29 @@ if __name__ == "__main__":
     """
     Uncomment the following lines to see usage of TechniCharter
     """
-    # candlesticks: list[Candlesticks] = [Candlesticks(instrument_symbol, candle_span, ApiDataframingServiceEnum.ALPHA_VANTAGE) for instrument_symbol in instrument_symbols]
+    candlesticks: list[Candlesticks] = [Candlesticks(instrument_symbol, candle_span, ApiSourceEnum.ALPHA_VANTAGE) for instrument_symbol in instrument_symbols]
     
-    # technical_indicators: dict[str, TechniCharter] = {}
-    # for candlestick in candlesticks:
-    #     technical_indicators[candlestick.instrument_symbol] = TechniCharter(candlestick)
+    technical_indicators: dict[str, TechniCharter] = {}
+    for candlestick in candlesticks:
+        technical_indicators[candlestick.instrument_symbol] = TechniCharter(candlestick)
 
-    # for symbol, technical_indicator in technical_indicators.items():
-    #     technical_indicator.macd().plot_macd()
-    #     technical_indicator.atr().plot_atr()
-    #     technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
-    #     technical_indicator.rsi().plot_rsi()
-    #     technical_indicator.adx().plot_adx()
+    for symbol, technical_indicator in technical_indicators.items():
+        technical_indicator.macd().plot_macd()
+        technical_indicator.atr().plot_atr()
+        technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
+        technical_indicator.rsi().plot_rsi()
+        technical_indicator.adx().plot_adx()
 
-    #     print(f"Indicator-Augmented Dataframe for {symbol}:")
-    #     print(technical_indicator.collect_as_dataframe())
+        print(f"Indicator-Augmented Dataframe for {symbol}:")
+        print(technical_indicator.collect_as_dataframe())
 
 
     """
     Uncomment the following lines to see usage of InstrumentCharter
     """
-    # pricer_charter: InstrumentCharter = InstrumentCharter(candlesticks[0])
-    # pricer_charter.plot_price_line()
-    # pricer_charter.plot_volume_bar()
+    pricer_charter: InstrumentCharter = InstrumentCharter(candlesticks[0])
+    pricer_charter.plot_price_line()
+    pricer_charter.plot_volume_bar()
 
 
     """
@@ -142,7 +146,7 @@ if __name__ == "__main__":
     renko: Renko = Renko(
         instrument_symbol='RELIANCE.BSE',
         source_candle_span=CandlespanEnum.DAILY,
-        source_api_class_for_dataframing=ApiDataframingServiceEnum.ALPHA_VANTAGE,
+        api_source=ApiSourceEnum.ALPHA_VANTAGE,
         brick_size_from_atr_of=(CandlespanEnum.DAILY, 300),
         # brick_size=100
     )

@@ -2,8 +2,9 @@ from typing import Literal
 import pandas as pd
 
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.api_dataframing import ApiDataframingServiceEnum
+from technical_analysis.enums.api_source import ApiSourceEnum
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
+from technical_analysis.kpis.kpi_calculator import KpiCalculator
 from technical_analysis.services.base_api_dataframing_service import BaseApiDataframingService
 
 
@@ -16,10 +17,10 @@ class InstrumentGroup:
         self,
         instrument_symbols: list[str],
         candle_span: CandlespanEnum,
-        source_api_class_for_dataframing: ApiDataframingServiceEnum,
+        api_source: ApiSourceEnum,
         na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = 'backfill'
     ):
-        self.__DATAFRAMING_CLASS: type[BaseApiDataframingService] = source_api_class_for_dataframing.value
+        self.__DATAFRAMING_CLASS: type[BaseApiDataframingService] = api_source.value
 
         self.__candle_span: CandlespanEnum = candle_span
         self.__na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = na_strategy
@@ -115,6 +116,38 @@ class InstrumentGroup:
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative volume change as the cell-data
         """
         return self.__get_cumulative_change_in_metric_df(OHLCVUDEnum.VOLUME)
+    
+
+    # Key Performance Indicators (KPIs)
+    @property
+    def cagrs(self) -> pd.Series:
+        """
+        A pandas Series with instrument symbols as index and CAGR (Compound Annual Growth Rate) as the data
+        """
+        df: pd.DataFrame = self.closes_df
+        if df.empty:
+            return pd.Series(dtype=float, name='CAGR', index=self.__instrument_symbols, data=0.0)
+
+        if self.__candle_span == CandlespanEnum.DAILY:
+            periods = len(df) / 252  # Assuming 252 trading days in a year
+        elif self.__candle_span == CandlespanEnum.WEEKLY:
+            periods = len(df) / 52
+        elif self.__candle_span == CandlespanEnum.MONTHLY:
+            periods = len(df) / 12
+        else:
+            raise ValueError("Unsupported candle span for CAGR calculation.")
+
+        cagrs: pd.Series = pd.Series(dtype=float, index=self.__instrument_symbols, name='CAGR')
+        for instrument_symbol in self.__instrument_symbols:
+            cagrs[instrument_symbol] = \
+                KpiCalculator.cagr(
+                    start_value = df[instrument_symbol].iloc[0],
+                    end_value = df[instrument_symbol].iloc[-1],
+                    periods = periods
+                )
+
+        return cagrs
+
 
 
     # Public Methods

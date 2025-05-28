@@ -9,6 +9,7 @@ import pandas as pd
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.indicators.indicator_calculator import IndicatorCalculator
 from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.renko import Renko
 
 
@@ -20,29 +21,31 @@ class TechniCharter:
 
     def __init__(
         self,
-        source_instrument: Candlesticks | Renko
+        source_instrument: Instrument
     ):
-        if not isinstance(source_instrument, (Candlesticks, Renko)):
-            raise TypeError("source_instrument must be an instance of Candlesticks or Renko.")
+        if not isinstance(source_instrument, Instrument):
+            raise TypeError("source_instrument must be an instance of Instrument or its subclasses.")
+        
+        self.__instrument: Instrument = source_instrument
 
-        self.__source_instrument: Candlesticks | Renko = source_instrument
-        self.__df = source_instrument.get_candlesticks() if isinstance(source_instrument, Candlesticks) else source_instrument.get_renko()
-
-
+        if isinstance(self.__instrument, Candlesticks):
+            self.__df: pd.DataFrame = self.__instrument.get_candlesticks()
+        elif isinstance(self.__instrument, Renko):
+            self.__df: pd.DataFrame = self.__instrument.get_renko()
+        else:
+            raise TypeError("TechniCharter support is currently limited to Candlesticks and Renko.")
+        
+    
     # Getters
     @property
-    def source_instrument(self) -> Candlesticks | Renko:
-        return self.__source_instrument
-
-    @property
-    def instrument_symbol(self) -> str:
-        return self.__source_instrument.instrument_symbol
+    def instrument(self) -> Instrument:
+        return self.__instrument
     
 
     # Chainable Setters
-    @source_instrument.setter
-    def source_instrument(self, source_instrument: Candlesticks | Renko) -> 'TechniCharter':
-        self.__source_instrument = source_instrument
+    @instrument.setter
+    def instrument(self, source_instrument: Instrument) -> 'TechniCharter':
+        self.__instrument = source_instrument
         return self
 
 
@@ -210,11 +213,11 @@ class TechniCharter:
         ax3: plt.Axes = None
 
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1, 1]})
-        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
         from technical_analysis.visualization.uni_instrument import InstrumentCharter
-        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
+        InstrumentCharter(self.instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -267,11 +270,11 @@ class TechniCharter:
         ax2: plt.Axes = None
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
         from technical_analysis.visualization.uni_instrument import InstrumentCharter
-        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
+        InstrumentCharter(self.instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -325,11 +328,11 @@ class TechniCharter:
         else:
             fig, ax1 = plt.subplots(1, 1, figsize=(14, 8))
         
-        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
         from technical_analysis.visualization.uni_instrument import InstrumentCharter
-        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
+        InstrumentCharter(self.instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
 
         ax1.plot(self.__df.index, self.__df['middle_boll_band'], label='Middle Band', color='blue')
         ax1.plot(self.__df.index, self.__df['upper_boll_band'], label='Upper Band', color='red')
@@ -382,11 +385,11 @@ class TechniCharter:
         ax2: plt.Axes = None
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
         from technical_analysis.visualization.uni_instrument import InstrumentCharter
-        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
+        InstrumentCharter(self.instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)
@@ -434,11 +437,11 @@ class TechniCharter:
         ax2: plt.Axes = None
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
-        fig.suptitle(title if title else f"{self.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
 
         # TODO: Remove plotting of price line graph after UI is implemented
         from technical_analysis.visualization.uni_instrument import InstrumentCharter
-        InstrumentCharter(self.__source_instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
+        InstrumentCharter(self.instrument).subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
         ax1.yaxis.set_major_locator(MaxNLocator(nbins=10))
         ax1.legend().set_visible(False)

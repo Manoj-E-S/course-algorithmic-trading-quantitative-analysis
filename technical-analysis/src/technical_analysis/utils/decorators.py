@@ -28,3 +28,13 @@ def mutually_exclusive_args(*exclusive_args):
         return wrapper
     
     return decorator
+
+
+def optionally_overridable(func):
+    """Marker: The method decorated with optionally_overridable may optionally be overridden in subclasses."""
+    return func
+
+
+def override(func):
+    """Marker: Used in subclasses to indicate that the method overrides a method in the parent class for better readability."""
+    return func
