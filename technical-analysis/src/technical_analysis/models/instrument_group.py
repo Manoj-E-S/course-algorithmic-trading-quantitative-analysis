@@ -94,6 +94,7 @@ class InstrumentGroup:
         """
         return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
 
+
     @property
     def cumulative_volume_change_df(self) -> pd.DataFrame:
         """

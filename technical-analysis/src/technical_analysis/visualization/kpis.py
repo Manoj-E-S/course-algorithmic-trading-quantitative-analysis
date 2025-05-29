@@ -82,8 +82,8 @@ class InstrumentKPIs:
             start_date: pd.Timestamp = self.__df.index[start_date_idx]
             end_date: pd.Timestamp = self.__df.index[end_date_idx]
         elif self.__instrument_type == Renko.__name__:
-            start_date: pd.Timestamp = self.__df[OHLCVUDEnum.DATETIME.value][start_date_idx]
-            end_date: pd.Timestamp = self.__df[OHLCVUDEnum.DATETIME.value][end_date_idx]
+            start_date: pd.Timestamp = self.__df[OHLCVUDEnum.DATETIME.value].iloc[start_date_idx]
+            end_date: pd.Timestamp = self.__df[OHLCVUDEnum.DATETIME.value].iloc[end_date_idx]
         else:
             raise TypeError("InstrumentKPIs support is currently limited to Candlesticks and Renko.")
 

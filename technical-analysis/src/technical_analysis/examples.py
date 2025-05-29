@@ -24,9 +24,11 @@ if __name__ == "__main__":
     """
     Setup data
     """
-    # main_metric: OHLCVUDEnum = OHLCVUDEnum.CLOSE
     candle_span: CandlespanEnum = CandlespanEnum.DAILY
     na_strategy: str = 'backfill'
+
+    brick_size_from_atr: tuple[CandlespanEnum, int] = (CandlespanEnum.DAILY, 300)
+    brick_size: int = 100
 
     # Uncomment below line for all valid instrument symbols
     instrument_symbols: list[str] = ['RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE']
@@ -47,9 +49,10 @@ if __name__ == "__main__":
 
 
     """
-    Uncomment below line to verify that invalid instruments are dropped by the InstrumentGroup
+    Uncomment below line to verify configurational properties of InstrumentGroup
     """
     # print(daily_indian_instruments_group.instrument_symbols)
+    # print(daily_indian_instruments_group.candle_span)
 
     """
     Uncomment below line to verify some dataframes from the InstrumentGroup
@@ -117,15 +120,18 @@ if __name__ == "__main__":
 
 
     """
-    Uncomment the following lines to see usage of TechniCharter
+    Uncomment the following lines to see usage of TechniCharter and InstrumentKPIs
     """
-    # candlesticks: list[Candlesticks] = [Candlesticks(instrument_symbol, candle_span, ApiSourceEnum.ALPHA_VANTAGE) for instrument_symbol in instrument_symbols]
-    
-    # technical_indicators: dict[str, TechniCharter] = {}
-    # for candlestick in daily_indian_instruments_group.as_candlesticks().values():
-    #     technical_indicators[candlestick.instrument_symbol] = TechniCharter(candlestick)
+    # technical_indicators_for_all_instruments: dict[str, TechniCharter] = {}
+    # kpis_for_all_instruments: dict[str, InstrumentKPIs] = {}
 
-    # for symbol, technical_indicator in technical_indicators.items():
+
+    # # With Candlesticks as the Instrument
+    # for candlestick in daily_indian_instruments_group.as_candlesticks().values():
+    #     technical_indicators_for_all_instruments[candlestick.instrument_symbol] = TechniCharter(candlestick)
+    #     kpis_for_all_instruments[candlestick.instrument_symbol] = InstrumentKPIs(candlestick)
+
+    # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
     #     technical_indicator.macd().plot_macd()
     #     technical_indicator.atr().plot_atr()
     #     technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
@@ -133,15 +139,55 @@ if __name__ == "__main__":
     #     technical_indicator.adx().plot_adx()
 
     #     print(f"Indicator-Augmented Dataframe for {symbol}:")
-    #     print(technical_indicator.collect_as_dataframe())
+    #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
+
+    # for symbol, kpi in kpis_for_all_instruments.items():
+    #     print(f"CAGR for {symbol}: {kpi.cagr()}")
+
+
+    # # With Renko as the Instrument
+    # for renko in daily_indian_instruments_group.as_renkos(brick_size_from_atr=brick_size_from_atr).values():
+    #     technical_indicators_for_all_instruments[renko.instrument_symbol] = TechniCharter(renko)
+    #     kpis_for_all_instruments[renko.instrument_symbol] = InstrumentKPIs(renko)
+
+    # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
+    #     technical_indicator.macd().plot_macd()
+    #     technical_indicator.atr().plot_atr()
+    #     technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
+    #     technical_indicator.rsi().plot_rsi()
+    #     technical_indicator.adx().plot_adx()
+
+    #     print(f"Indicator-Augmented Dataframe for {symbol}:")
+    #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
+    
+    # for symbol, kpi in kpis_for_all_instruments.items():
+    #     print(f"CAGR for {symbol}: {kpi.cagr()}")
+
 
 
     """
     Uncomment the following lines to see usage of InstrumentCharter
     """
-    # pricer_charter: InstrumentCharter = InstrumentCharter(daily_indian_instruments_group.as_candlesticks()['RELIANCE.BSE'])
-    # pricer_charter.plot_price_line()
-    # pricer_charter.plot_volume_bar()
+    # instrument_charters: dict[str, InstrumentCharter] = {}
+
+
+    # # With Candlesticks as the Instrument
+    # for candlestick in daily_indian_instruments_group.as_candlesticks().values():
+    #     instrument_charters[candlestick.instrument_symbol] = InstrumentCharter(candlestick)
+
+    # for symbol, charter in instrument_charters.items():
+    #     charter.plot_price_line()
+    #     charter.plot_volume_bar()
+
+
+    # # With Renko as the Instrument  
+    # for renko in daily_indian_instruments_group.as_renkos(brick_size=brick_size).values():
+    #     instrument_charters[renko.instrument_symbol] = InstrumentCharter(renko)
+
+    # for symbol, charter in instrument_charters.items():
+    #     charter.plot_price_line()
+    #     # TODO: Extend Volume support to Renko
+    #     # charter.plot_volume_bar()
 
 
     """
@@ -151,15 +197,9 @@ if __name__ == "__main__":
         instrument_symbol='RELIANCE.BSE',
         source_candle_span=CandlespanEnum.DAILY,
         data_view_provider=common_data_view_provider,
-        brick_size_from_atr=(CandlespanEnum.DAILY, 300),
-        # brick_size=100
+        brick_size_from_atr=brick_size_from_atr,
+        # brick_size=brick_size
     )
+    print(f"Renko Instrument Symbol: {renko.instrument_symbol}")
     print(f"Renko Brick Size: {renko.brick_size}")
     print(f"Renko DataFrame:\n{renko.get_renko()}")
-
-
-    """
-    Uncomment the following lines to see the usage of InstrumentKPIs
-    """
-    daily_indian_instrument_kpis: InstrumentKPIs = InstrumentKPIs(daily_indian_instruments_group.as_candlesticks()['RELIANCE.BSE'])
-    print(f"CAGR for RELIANCE.BSE: {daily_indian_instrument_kpis.cagr()}")
