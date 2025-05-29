@@ -1,29 +1,32 @@
 from typing import Literal
+
 import pandas as pd
 
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.api_source import ApiSourceEnum
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
-from technical_analysis.kpis.kpi_calculator import KpiCalculator
-from technical_analysis.services.base_api_dataframing_service import BaseApiDataframingService
+from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.renko import Renko
+from technical_analysis.providers.data_view import DataViewProvider
+from technical_analysis.utils.decorators import mutually_exclusive_args
 
 
 class InstrumentGroup:
     """
     A class to get all dataframes useful for financial analyses
     """
+    # Type Aliases
+    _AllowedSimpleMovingOperationsType = Literal['mean', 'var', 'std', 'corr', 'cov', 'min', 'max']
+    _AllowedExponentialMovingOperationsType = Literal['mean', 'var', 'std', 'corr', 'cov']
+    _AvailableDataFramesType = Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change']
 
     def __init__(
         self,
         instrument_symbols: list[str],
         candle_span: CandlespanEnum,
-        api_source: ApiSourceEnum,
-        na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = 'backfill'
+        data_view_provider: DataViewProvider
     ):
-        self.__DATAFRAMING_CLASS: type[BaseApiDataframingService] = api_source.value
-
         self.__candle_span: CandlespanEnum = candle_span
-        self.__na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill'] = na_strategy
+        self.__views: DataViewProvider = data_view_provider
 
         print("[WARNING] Initializing InstrumentGroup instruments. Invalid instrument symbols (if any), will be dropped")
         self.__instrument_symbols: list[str] = self.__filter_valid_instruments(instrument_symbols)
@@ -37,11 +40,7 @@ class InstrumentGroup:
     @property
     def instrument_symbols(self) -> list[str]:
         return self.__instrument_symbols
-    
-    @property
-    def na_strategy(self) -> Literal['drop_index', 'drop_column', 'backfill', 'forwardfill']:
-        return self.__na_strategy
-    
+
 
     # Chainable Setters
     @candle_span.setter
@@ -54,29 +53,14 @@ class InstrumentGroup:
         self.__instrument_symbols = instrument_symbols
         return self
 
-    @na_strategy.setter
-    def na_strategy(self, na_strategy: Literal['drop_index', 'drop_column', 'backfill', 'forwardfill']) -> 'InstrumentGroup':
-        self.__na_strategy = na_strategy
-        return self
 
-
-    # Additional Properties
-    @property
-    def instrument_ohlcvdf_dict(self) -> dict[str, pd.DataFrame]:
-        dfs_dict: dict[str, pd.DataFrame] = self.__DATAFRAMING_CLASS.get_instrument_ohlcvdf_dict(self.__candle_span, self.__instrument_symbols)
-
-        if not dfs_dict:
-            raise ValueError(f"Could not fetch instrument data for candle_span: {self.__candle_span.value}, instrument_symbols: {self.__instrument_symbols}")
-        
-        return dfs_dict
-    
-
+    # Comparative Dataframes
     @property
     def closes_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and close prices as the cell-data
         """
-        return self.__get_metric_df(OHLCVUDEnum.CLOSE)
+        return self.__views.instrument_group_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
     
 
     @property
@@ -84,207 +68,114 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume as the cell-data
         """
-        return self.__get_metric_df(OHLCVUDEnum.VOLUME)
-    
+        return self.__views.instrument_group_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
+
 
     @property
     def returns_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and returns as the cell-data
         """
-        return self.__get_change_in_metric_df(OHLCVUDEnum.CLOSE)
-    
+        return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
+
 
     @property
     def volume_change_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume change as the cell-data
         """
-        return self.__get_change_in_metric_df(OHLCVUDEnum.VOLUME)
-    
+        return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
+
 
     @property
     def cumulative_returns_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative returns as the cell-data
         """
-        return self.__get_cumulative_change_in_metric_df(OHLCVUDEnum.CLOSE)
+        return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
 
     @property
     def cumulative_volume_change_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative volume change as the cell-data
         """
-        return self.__get_cumulative_change_in_metric_df(OHLCVUDEnum.VOLUME)
-    
-
-    # Key Performance Indicators (KPIs)
-    @property
-    def cagrs(self) -> pd.Series:
-        """
-        A pandas Series with instrument symbols as index and CAGR (Compound Annual Growth Rate) as the data
-        """
-        df: pd.DataFrame = self.closes_df
-        if df.empty:
-            return pd.Series(dtype=float, name='CAGR', index=self.__instrument_symbols, data=0.0)
-
-        if self.__candle_span == CandlespanEnum.DAILY:
-            periods = len(df) / 252  # Assuming 252 trading days in a year
-        elif self.__candle_span == CandlespanEnum.WEEKLY:
-            periods = len(df) / 52
-        elif self.__candle_span == CandlespanEnum.MONTHLY:
-            periods = len(df) / 12
-        else:
-            raise ValueError("Unsupported candle span for CAGR calculation.")
-
-        cagrs: pd.Series = pd.Series(dtype=float, index=self.__instrument_symbols, name='CAGR')
-        for instrument_symbol in self.__instrument_symbols:
-            cagrs[instrument_symbol] = \
-                KpiCalculator.cagr(
-                    start_value = df[instrument_symbol].iloc[0],
-                    end_value = df[instrument_symbol].iloc[-1],
-                    periods = periods
-                )
-
-        return cagrs
-
+        return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
 
 
     # Public Methods
-    def add_instrument(self, instrument_symbol: str) -> None:
+    def as_candlesticks(self) -> dict[str, Candlesticks]:
+        return {
+            instrument_symbol: Candlesticks(instrument_symbol, self.__candle_span, self.__views)
+            for instrument_symbol in self.__instrument_symbols
+        }
+
+
+    @mutually_exclusive_args("brick_size_from_atr", "brick_size")
+    def as_renkos(
+        self, 
+        brick_size_from_atr: tuple[CandlespanEnum, Renko._NumberOfPeriodsType] | None = None,
+        brick_size: int | None = None
+    ) -> dict[str, Renko]:
+        return {
+            instrument_symbol: Renko(instrument_symbol, self.__candle_span, self.__views, brick_size_from_atr, brick_size)
+            for instrument_symbol in self.__instrument_symbols
+        }
+    
+
+    def add_instrument(self, instrument_symbol: str) -> 'InstrumentGroup':
         if instrument_symbol not in self.__instrument_symbols:
-            if not self.__DATAFRAMING_CLASS.is_instrument_valid(self.__candle_span, instrument_symbol):
-                raise Exception(f"Unable to add instrument {instrument_symbol}. {instrument_symbol} seems to be invalid")
+            if not self.__views.source_api.is_instrument_valid(self.__candle_span, instrument_symbol):
+                raise ValueError(f"Unable to add instrument {instrument_symbol}. {instrument_symbol} seems to be invalid")
         
             self.__instrument_symbols.append(instrument_symbol)
-            
 
-    def remove_instrument(self, instrument_symbol: str) -> None:
+        return self
+    
+
+    def remove_instrument(self, instrument_symbol: str) -> 'InstrumentGroup':
         if instrument_symbol in self.__instrument_symbols:
             self.__instrument_symbols.remove(instrument_symbol)
-    
+
+        return self
+
 
     def apply_simple_moving_operation(
         self,
-        on_which_data: Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change'],
-        which_operation: Literal['mean', 'var', 'std', 'min', 'max'],
+        on_which_data: _AvailableDataFramesType,
+        which_operation: _AllowedSimpleMovingOperationsType,
         window: int
     ) -> pd.DataFrame:
         
-        df: pd.DataFrame = pd.DataFrame()
-        if on_which_data == 'closes':
-            df = self.closes_df
-        elif on_which_data == 'returns':
-            df = self.returns_df
-        elif on_which_data == 'cumulative_returns':
-            df = self.cumulative_returns_df
-        elif on_which_data == 'volume':
-            df = self.volume_df
-        elif on_which_data == 'volume_change':
-            df = self.volume_change_df
-        elif on_which_data == 'cumulative_volume_change':
-            df = self.cumulative_volume_change_df
-        else:
-            raise ValueError(f"Unsupported dataframe: {on_which_data}")
-
-        if which_operation == 'mean':
-            return df.rolling(window=window).mean().dropna(axis='index')
-        elif which_operation == 'var':
-            return df.rolling(window=window).var().dropna(axis='index')
-        elif which_operation == 'std':
-            return df.rolling(window=window).std().dropna(axis='index')
-        elif which_operation == 'min':
-            return df.rolling(window=window).min().dropna(axis='index')
-        elif which_operation == 'max':
-            return df.rolling(window=window).max().dropna(axis='index')
-        else:
-            raise ValueError(f"Unsupported operation: {which_operation}")
+        return self.__operate_on_df(
+            self.__resolve_df(on_which_data),
+            operation=which_operation,
+            operation_type='simple',
+            window=window
+        )
 
 
     def apply_exponential_moving_operation(
         self,
-        on_which_data: Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change'],
-        which_operation: Literal['mean', 'var', 'std', 'corr', 'cov'], 
+        on_which_data: _AvailableDataFramesType,
+        which_operation: _AllowedExponentialMovingOperationsType, 
         window: int,
         min_periods: int = 0,
     ) -> pd.DataFrame:
         
-        df: pd.DataFrame = pd.DataFrame()
-        if on_which_data == 'closes':
-            df = self.closes_df
-        elif on_which_data == 'returns':
-            df = self.returns_df
-        elif on_which_data == 'cumulative_returns':
-            df = self.cumulative_returns_df
-        elif on_which_data == 'volume':
-            df = self.volume_df
-        elif on_which_data == 'volume_change':
-            df = self.volume_change_df
-        elif on_which_data == 'cumulative_volume_change':
-            df = self.cumulative_volume_change_df
-        else:
-            raise ValueError(f"Unsupported dataframe: {on_which_data}")
-
-        if which_operation == 'mean':
-            return df.ewm(span=window, min_periods=min_periods).mean().dropna(axis='index')
-        elif which_operation == 'var':
-            return df.ewm(span=window, min_periods=min_periods).var().dropna(axis='index')
-        elif which_operation == 'std':
-            return df.ewm(span=window, min_periods=min_periods).std().dropna(axis='index')
-        elif which_operation == 'corr':
-            return df.ewm(span=window, min_periods=min_periods).corr().dropna(axis='index')
-        elif which_operation == 'cov':
-            return df.ewm(span=window, min_periods=min_periods).cov().dropna(axis='index')
-        else:
-            raise ValueError(f"Unsupported operation: {which_operation}")
+        return self.__operate_on_df(
+            self.__resolve_df(on_which_data),
+            operation=which_operation,
+            operation_type='exponential',
+            window=window,
+            min_periods=min_periods
+        )
     
     
     # Private Methods
-    def __backfillna(
-        self,
-        df: pd.DataFrame
-    ) -> pd.DataFrame:
-        return df.bfill(inplace=False)
-    
-
-    def __forwardfillna(
-        self,
-        df: pd.DataFrame
-    ) -> pd.DataFrame:
-        return df.ffill(inplace=False)
-
-    
-    def __dropna_by_index(
-        self,
-        df: pd.DataFrame
-    ) -> pd.DataFrame:
-        return df.dropna(axis='index', inplace=False)
-    
-
-    def __dropna_by_column(
-        self,
-        df: pd.DataFrame
-    ) -> pd.DataFrame:
-        return df.dropna(axis='columns', inplace=False)
-    
-
-    def __handle_na_by_strategy(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.__na_strategy == 'backfill':
-            df = self.__backfillna(df)
-        elif self.__na_strategy == 'forwardfill':
-            df = self.__forwardfillna(df)
-        elif self.__na_strategy == 'drop_index':
-            df = self.__dropna_by_index(df)
-        elif self.__na_strategy == 'drop_column':
-            df = self.__dropna_by_column(df)
-
-        return df
-    
-
     def __filter_valid_instruments(self, instrument_symbols: list[str]) -> list[str]:
         valid_instrument_symbols: list[str] = []
         for instrument_symbol in instrument_symbols:
-            if not self.__DATAFRAMING_CLASS.is_instrument_valid(self.__candle_span, instrument_symbol):
+            if not self.__views.source_api.is_instrument_valid(self.__candle_span, instrument_symbol):
                 print(f"[WARNING] Instrument {instrument_symbol} is invalid and hence dropped")
                 continue
 
@@ -297,49 +188,82 @@ class InstrumentGroup:
         return valid_instrument_symbols
     
 
-    def __get_metric_df(self, metric: OHLCVUDEnum) -> pd.DataFrame:
-        df: pd.DataFrame | None = self.__DATAFRAMING_CLASS.get_all_instruments_dataframe_by_metric(
-            metric,
-            self.__candle_span,
-            self.__instrument_symbols
-        )
-
-        if df is None:
-            raise ValueError(f"Could not fetch dataframe for metric: {metric.value}, candle_span: {self.__candle_span.value}, instrument_symbols: {self.__instrument_symbols}")
-        
-        return self.__handle_na_by_strategy(df)
-
-
-    def __get_change_in_metric_df(self, metric: OHLCVUDEnum) -> pd.DataFrame:
+    def __resolve_df(
+        self,
+        df_name: _AvailableDataFramesType
+    ) -> pd.DataFrame:
         """
-        Daily, Weekly, or Monthly (based on candle_span) returns for OHLC metrics, volume change for V metric
+        Resolves the DataFrame based on the provided DataFrame name.
         """
-        df = self.__get_metric_df(metric)
+        unsupported_df_err_msg: str = \
+            f"Unsupported Data: {df_name}. Allowed data are: [{', '.join(['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change'])}]."
 
-        # Avoid division by zero
-        shifted_df = df.shift(1).replace(0, 1e-10)
-
-        change_in_metric_df = (df / shifted_df) - 1
-        change_in_metric_df.dropna(axis='index', inplace=True)
-
-        # Clip extreme values to avoid numerical instability
-        change_in_metric_df = change_in_metric_df.clip(lower=-1e10, upper=1e10)
+        if df_name == "closes":
+            return self.closes_df
+        elif df_name == "returns":
+            return self.returns_df
+        elif df_name == "cumulative_returns":
+            return self.cumulative_returns_df
+        elif df_name == "volume":
+            return self.volume_df
+        elif df_name == "volume_change":
+            return self.volume_change_df
+        elif df_name == "cumulative_volume_change":
+            return self.cumulative_volume_change_df
+        else:
+            raise ValueError(unsupported_df_err_msg)
         
-        return change_in_metric_df
     
-
-    def __get_cumulative_change_in_metric_df(self, metric: OHLCVUDEnum, initial_value: float = 1) -> pd.DataFrame:
+    def __operate_on_df(
+        self,
+        df: pd.DataFrame,
+        operation: Literal['mean', 'var', 'std', 'min', 'max', 'corr', 'cov'],
+        operation_type: Literal['simple', 'exponential'],
+        window: int,
+        min_periods: int = 0
+    ) -> pd.DataFrame:
         """
-        Daily, Weekly, or Monthly (based on candle_span) cumulative compounded returns for OHLC metrics, cumulative volume change for V metric
-        
-        Compounding:
-        => metric_initial_value * (1 + change_in_metric_between_candle_0_and_1) * (1 + change_in_metric_between_candle_1_and_2) * ...
-        => 1 * cumulative_product(1 + change_in_metric_between_candle_i_and_(i+1))
-        where 
-            metric_initial_value = 1 (assumed to be 1, by default)
+        Resolves the DataFrame and applies the specified operation.
         """
-        return initial_value * (1 + self.__get_change_in_metric_df(metric)).cumprod().dropna(axis='index')
-    
+        unsupported_operation_err_msg: str = \
+            f"{operation_type.capitalize()} {operation} operation is not supported. Allowed operations are: [{', '.join(['mean', 'var', 'std', 'corr', 'cov', 'min', 'max'] if operation_type == 'simple' else ['mean', 'var', 'std', 'corr', 'cov'])}]."
 
+        unsupported_operation_type_err_msg: str = \
+            f"{operation_type.capitalize()} is an unsupported operation type. Allowed operation types are: ['simple', 'exponential']."
 
+        if operation_type == 'simple':
 
+            if operation == 'mean':
+                return df.rolling(window=window, min_periods=min_periods).mean().dropna(axis='index')
+            elif operation == 'var':
+                return df.rolling(window=window, min_periods=min_periods).var().dropna(axis='index')
+            elif operation == 'std':
+                return df.rolling(window=window, min_periods=min_periods).std().dropna(axis='index')
+            elif operation == 'corr':
+                return df.rolling(window=window, min_periods=min_periods).corr().dropna(axis='index')
+            elif operation == 'cov':
+                return df.rolling(window=window, min_periods=min_periods).cov().dropna(axis='index')
+            elif operation == 'min':
+                return df.rolling(window=window, min_periods=min_periods).min().dropna(axis='index')
+            elif operation == 'max':
+                return df.rolling(window=window, min_periods=min_periods).max().dropna(axis='index')
+            else:
+                raise ValueError(unsupported_operation_err_msg)
+            
+        elif operation_type == 'exponential':
+
+            if operation == 'mean':
+                return df.ewm(span=window, min_periods=min_periods).mean().dropna(axis='index')
+            elif operation == 'var':
+                return df.ewm(span=window, min_periods=min_periods).var().dropna(axis='index')
+            elif operation == 'std':
+                return df.ewm(span=window, min_periods=min_periods).std().dropna(axis='index')
+            elif operation == 'corr':
+                return df.ewm(span=window, min_periods=min_periods).corr().dropna(axis='index')
+            elif operation == 'cov':
+                return df.ewm(span=window, min_periods=min_periods).cov().dropna(axis='index')
+            else:
+                raise ValueError(unsupported_operation_err_msg)
+            
+        else:
+            raise ValueError(unsupported_operation_type_err_msg)

@@ -9,6 +9,7 @@ from technical_analysis.mappers.candlespan_to_api import CandlespanToApi
 from technical_analysis.mappers.candlespan_to_ohlcv_keys import CandlespanToOhlcvKeys
 from technical_analysis.mappers.candlespan_to_service_method import CandlespanToServiceMethod
 from technical_analysis.services.base_api_dataframing_service import BaseApiDataframingService
+from technical_analysis.utils.decorators import override
 
 
 class ApiDataframingService(BaseApiDataframingService):
@@ -20,7 +21,7 @@ class ApiDataframingService(BaseApiDataframingService):
         pass
 
 
-    # override
+    @override
     @classmethod
     def _get_aggregated_data_for_multiple_instruments(
         cls,
@@ -74,7 +75,7 @@ class ApiDataframingService(BaseApiDataframingService):
         return instruments
 
 
-    # override
+    @override
     @classmethod
     def get_all_instruments_dataframe_by_metric(
         cls,
@@ -106,7 +107,7 @@ class ApiDataframingService(BaseApiDataframingService):
         return df
     
 
-    # override
+    @override
     @classmethod
     def get_ohlcv_dataframe_by_symbol(
         cls,
@@ -146,28 +147,7 @@ class ApiDataframingService(BaseApiDataframingService):
         return datewise_ohlcv_df
     
 
-    # override
-    @classmethod
-    def get_instrument_ohlcvdf_dict(
-        cls,
-        candle_span: CandlespanEnum,
-        instrument_symbols: list[str]
-    ) -> dict[str, pd.DataFrame]:
-        dfs_dict: dict[str, pd.DataFrame] = {}
-        for instrument_symbol in instrument_symbols:
-            df: pd.DataFrame = ApiDataframingService.get_ohlcv_dataframe_by_symbol(candle_span, instrument_symbol)
-
-            if df is None:
-                print(f"No data found for the given instrument symbol: {instrument_symbol}")
-                print(f"Skipping {instrument_symbol}...")
-                continue
-            
-            dfs_dict[instrument_symbol] = df
-        
-        return dfs_dict
-    
-
-    # override
+    @override
     @classmethod
     def is_instrument_valid(
         cls,

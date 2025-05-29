@@ -1,8 +1,8 @@
 import pandas as pd
 
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.api_source import ApiSourceEnum
 from technical_analysis.models.instrument import Instrument
+from technical_analysis.providers.data_view import DataViewProvider
 
 
 class Candlesticks(Instrument):
@@ -14,9 +14,10 @@ class Candlesticks(Instrument):
         self,
         instrument_symbol: str,
         candle_span: CandlespanEnum,
-        api_source: ApiSourceEnum
+        data_view_provider: DataViewProvider,
     ):
-        super().__init__(instrument_symbol, candle_span, api_source)
+        super().__init__(instrument_symbol, candle_span, data_view_provider)
+
 
     # Public Methods
     def get_candlesticks(self) -> pd.DataFrame:

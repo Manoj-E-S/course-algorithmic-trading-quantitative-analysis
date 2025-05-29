@@ -1,8 +1,7 @@
 import pandas as pd
 
-from technical_analysis.enums.api_source import ApiSourceEnum
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.services.base_api_dataframing_service import BaseApiDataframingService
+from technical_analysis.providers.data_view import DataViewProvider
 from technical_analysis.utils.decorators import optionally_overridable
 
 
@@ -15,9 +14,9 @@ class Instrument:
         self,
         instrument_symbol: str,
         candle_span: CandlespanEnum,
-        api_source: ApiSourceEnum
+        data_view_provider: DataViewProvider
     ):
-        self._DATAFRAMING_CLASS: type[BaseApiDataframingService] = api_source.value
+        self._views: DataViewProvider = data_view_provider
         self._candle_span: CandlespanEnum = candle_span
 
         self._raise_if_invalid_instrument(instrument_symbol)
@@ -67,7 +66,7 @@ class Instrument:
         
         :raises ValueError: If the instrument symbol is not valid
         """
-        if not self._DATAFRAMING_CLASS.is_instrument_valid(self._candle_span, instrument_symbol=instrument_symbol):
+        if not self._views.source_api.is_instrument_valid(self._candle_span, instrument_symbol=instrument_symbol):
             print(f"[ERROR] {self.__class__.__name__} class Initialization Error")
             error_message: str = f"Instrument {instrument_symbol} is invalid"
             raise ValueError(error_message)
@@ -79,7 +78,7 @@ class Instrument:
         Perform actions after any properties in the base/subclass are updated.
         
         In Base Class: 
-            sets the ohlcv_df, indicators, and charter for the current instrument symbol and candle span.
+            sets the ohlcv_df for the current instrument symbol and candle span.
         
         In Subclass:
             May be overridden to perform additional actions after property updates.
@@ -87,4 +86,4 @@ class Instrument:
         :return: None
         :rtype: None
         """
-        self._df = self._DATAFRAMING_CLASS.get_ohlcv_dataframe_by_symbol(self._candle_span, self._instrument_symbol)
+        self._df = self._views.instrument_ohlcv_view(self._candle_span, self._instrument_symbol)

@@ -1,7 +1,3 @@
-import pandas as pd
-from technical_analysis.enums.candlespan import CandlespanEnum
-
-
 class KpiCalculator:
     """
     A class to calculate various KPIs for the trading strategy.
