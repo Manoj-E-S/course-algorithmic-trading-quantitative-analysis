@@ -40,7 +40,8 @@ class DataViewProvider:
     # Chainable Setters
     @data_cleaner.setter
     def data_cleaner(self, data_cleaning_provider: DataCleaningProvider) -> 'DataViewProvider':
-        self._data_cleaner = data_cleaning_provider
+        if self._data_cleaner != data_cleaning_provider:
+            self._data_cleaner = data_cleaning_provider
         return self
 
 
@@ -66,6 +67,60 @@ class DataViewProvider:
             raise ValueError(f"No {candle_span.value} OHLCV data found for instrument symbol: {instrument_symbol}.")
 
         return self.data_cleaner.clean(df)
+    
+
+    def instrument_returns_view(
+        self,
+        candle_span: CandlespanEnum,
+        instrument_symbol: str
+    ) -> pd.Series:
+        """
+        Returns the returns view for the instrument.
+        
+        :param candle_span: The candle span for the returns data.
+        :type candle_span: CandlespanEnum
+        
+        :param instrument_symbol: The symbol of the instrument.
+        :type instrument_symbol: str
+        
+        :return: A Series containing the returns data for the given instrument symbol.
+        :rtype: pd.Series
+        
+        :raises ValueError: If returns data is not found for the given instrument symbol.
+        """
+        df: pd.DataFrame = self.instrument_ohlcv_view(candle_span, instrument_symbol)
+
+        if df.empty:
+            raise ValueError(f"No {candle_span.value} returns data found for instrument symbol: {instrument_symbol}.")
+
+        return df[OHLCVUDEnum.CLOSE.value].pct_change(fill_method=None).dropna(axis='index')
+    
+
+    def instrument_cumulative_returns_view(
+        self,
+        candle_span: CandlespanEnum,
+        instrument_symbol: str,
+        initial_value: float = 1.0
+    ) -> pd.Series:
+        """
+        Returns the cumulative returns view for the instrument.
+
+        :param candle_span: The candle span for the cumulative returns data.
+        :type candle_span: CandlespanEnum
+
+        :param instrument_symbol: The symbol of the instrument.
+        :type instrument_symbol: str
+
+        :param initial_value: The initial value to start the cumulative returns calculation from. Default is 1.0.
+        :type initial_value: float
+
+        :return: A Series containing the cumulative returns data for the given instrument symbol.
+        :rtype: pd.Series
+
+        :raises ValueError: If cumulative returns data is not found for the given instrument symbol.
+        """
+        returns_series = self.instrument_returns_view(candle_span, instrument_symbol)
+        return initial_value * (1 + returns_series).cumprod().dropna(axis='index')
 
 
     def instrument_group_ohlcv_view(
@@ -158,7 +213,7 @@ class DataViewProvider:
         :raises ValueError: If no data is found for the given instrument symbols and metric.
         """
         df: pd.DataFrame = self.instrument_group_metric_view(metric, candle_span, instrument_symbols)
-        return df.pct_change().dropna(axis='index')
+        return df.pct_change(fill_method=None).dropna(axis='index')
     
 
     def instrument_group_cumulative_change_in_metric_view(

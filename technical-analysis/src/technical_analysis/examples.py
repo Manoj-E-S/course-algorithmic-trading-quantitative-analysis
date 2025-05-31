@@ -52,7 +52,7 @@ if __name__ == "__main__":
     Uncomment below line to verify configurational properties of InstrumentGroup
     """
     # print(daily_indian_instruments_group.instrument_symbols)
-    # print(daily_indian_instruments_group.candle_span)
+    # print(daily_indian_instruments_group.candle_span.value)
 
     """
     Uncomment below line to verify some dataframes from the InstrumentGroup
@@ -122,14 +122,14 @@ if __name__ == "__main__":
     """
     Uncomment the following lines to see usage of TechniCharter and InstrumentKPIs
     """
-    # technical_indicators_for_all_instruments: dict[str, TechniCharter] = {}
-    # kpis_for_all_instruments: dict[str, InstrumentKPIs] = {}
+    technical_indicators_for_all_instruments: dict[str, TechniCharter] = {}
+    kpis_for_all_instruments: dict[str, InstrumentKPIs] = {}
 
 
-    # # With Candlesticks as the Instrument
-    # for candlestick in daily_indian_instruments_group.as_candlesticks().values():
-    #     technical_indicators_for_all_instruments[candlestick.instrument_symbol] = TechniCharter(candlestick)
-    #     kpis_for_all_instruments[candlestick.instrument_symbol] = InstrumentKPIs(candlestick)
+    # With Candlesticks as the Instrument
+    for candlestick in daily_indian_instruments_group.as_candlesticks().values():
+        technical_indicators_for_all_instruments[candlestick.instrument_symbol] = TechniCharter(candlestick)
+        kpis_for_all_instruments[candlestick.instrument_symbol] = InstrumentKPIs(candlestick)
 
     # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
     #     technical_indicator.macd().plot_macd()
@@ -141,14 +141,23 @@ if __name__ == "__main__":
     #     print(f"Indicator-Augmented Dataframe for {symbol}:")
     #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
 
-    # for symbol, kpi in kpis_for_all_instruments.items():
-    #     print(f"CAGR for {symbol}: {kpi.cagr()}")
+    for symbol, kpi in kpis_for_all_instruments.items():
+        print(f"Instrument Symbol: {symbol}, Candle Span: {kpi.instrument.candle_span.value}")
+        print("==============================================================")
+        print(f"CAGR: {kpi.cagr()}")
+        print(f"Volatility: {kpi.annualized_volatility()}")
+        print(f"Sharpe Ratio: {kpi.sharpe_ratio(risk_free_rate=0.06)}")
+        print(f"Sortino Ratio: {kpi.sortino_ratio(risk_free_rate=0.06)}")
+        print(f"Max Drawdown: {kpi.max_drawdown()}")
+        print(f"Calmar Ratio: {kpi.calmar_ratio()}")
+        print()
+
 
 
     # # With Renko as the Instrument
-    # for renko in daily_indian_instruments_group.as_renkos(brick_size_from_atr=brick_size_from_atr).values():
-    #     technical_indicators_for_all_instruments[renko.instrument_symbol] = TechniCharter(renko)
-    #     kpis_for_all_instruments[renko.instrument_symbol] = InstrumentKPIs(renko)
+    for renko in daily_indian_instruments_group.as_renkos(brick_size_from_atr=brick_size_from_atr).values():
+        technical_indicators_for_all_instruments[renko.instrument_symbol] = TechniCharter(renko)
+        kpis_for_all_instruments[renko.instrument_symbol] = InstrumentKPIs(renko)
 
     # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
     #     technical_indicator.macd().plot_macd()
@@ -160,8 +169,16 @@ if __name__ == "__main__":
     #     print(f"Indicator-Augmented Dataframe for {symbol}:")
     #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
     
-    # for symbol, kpi in kpis_for_all_instruments.items():
-    #     print(f"CAGR for {symbol}: {kpi.cagr()}")
+    for symbol, kpi in kpis_for_all_instruments.items():
+        print(f"Instrument Symbol: {symbol}, Candle Span: {kpi.instrument.candle_span.value}")
+        print("==============================================================")
+        print(f"CAGR: {kpi.cagr()}")
+        print(f"Volatility: {kpi.annualized_volatility()}")
+        print(f"Sharpe Ratio: {kpi.sharpe_ratio(risk_free_rate=0.06)}")
+        print(f"Sortino Ratio: {kpi.sortino_ratio(risk_free_rate=0.06)}")
+        print(f"Max Drawdown: {kpi.max_drawdown()}")
+        print(f"Calmar Ratio: {kpi.calmar_ratio()}")
+        print()
 
 
 
@@ -193,13 +210,13 @@ if __name__ == "__main__":
     """
     Uncomment the following lines to see usage of Renko
     """
-    renko: Renko = Renko(
-        instrument_symbol='RELIANCE.BSE',
-        source_candle_span=CandlespanEnum.DAILY,
-        data_view_provider=common_data_view_provider,
-        brick_size_from_atr=brick_size_from_atr,
-        # brick_size=brick_size
-    )
-    print(f"Renko Instrument Symbol: {renko.instrument_symbol}")
-    print(f"Renko Brick Size: {renko.brick_size}")
-    print(f"Renko DataFrame:\n{renko.get_renko()}")
+    # renko: Renko = Renko(
+    #     instrument_symbol='RELIANCE.BSE',
+    #     source_candle_span=CandlespanEnum.DAILY,
+    #     data_view_provider=common_data_view_provider,
+    #     brick_size_from_atr=brick_size_from_atr,
+    #     # brick_size=brick_size
+    # )
+    # print(f"Renko Instrument Symbol: {renko.instrument_symbol}")
+    # print(f"Renko Brick Size: {renko.brick_size}")
+    # print(f"Renko DataFrame:\n{renko.renko_df}")

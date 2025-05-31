@@ -27,9 +27,9 @@ class InstrumentCharter:
         self.__instrument: Instrument = source_instrument
 
         if isinstance(source_instrument, Candlesticks):
-            self.__df: pd.DataFrame = source_instrument.get_candlesticks()
+            self.__df: pd.DataFrame = source_instrument.candle_df
         elif isinstance(source_instrument, Renko):
-            self.__df = source_instrument.get_renko()
+            self.__df = source_instrument.renko_df
         else:
             raise TypeError("InstrumentCharter support is currently limited to Candlesticks and Renko.")
 

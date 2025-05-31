@@ -1,3 +1,4 @@
+from functools import cached_property
 import pandas as pd
 
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
@@ -5,7 +6,7 @@ from technical_analysis.indicators.indicator_calculator import IndicatorCalculat
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.providers.data_view import DataViewProvider
-from technical_analysis.utils.decorators import mutually_exclusive_args
+from technical_analysis.utils.decorators import mutually_exclusive_args, override
 
 
 class Renko(Instrument):
@@ -45,20 +46,35 @@ class Renko(Instrument):
 
     # Getters
     @property
-    def source_candle_span(self) -> str:
-        return self.candle_span
+    def source_candle_span(self) -> CandlespanEnum:
+        return self._candle_span
     
     @property
     def brick_size(self) -> int:
         return self.__brick_size
     
-    @property
+
+    # Chainable Setters
+    @brick_size.setter
+    def brick_size(self, brick_size: int) -> 'Renko':
+        if self.__brick_size != brick_size:
+            self.__brick_size = brick_size
+            self._after_property_update()
+        return self
+    
+    @source_candle_span.setter
+    def source_candle_span(self, source_candle_span: CandlespanEnum) -> 'Renko':
+        if self._candle_span != source_candle_span:
+            self._candle_span = source_candle_span
+            self._after_property_update()
+        return self
+    
+
+    # Cached Properties
+    @cached_property
     def source_candle_df(self) -> pd.DataFrame:
 
-        if OHLCVUDEnum.DATETIME.value in self.ohlcv_df.columns:
-            return self.ohlcv_df
-
-        candle_df: pd.DataFrame = self.ohlcv_df
+        candle_df: pd.DataFrame = self.ohlcv_df.copy(deep=True)
         candle_df.reset_index(inplace=True)
         candle_df.rename(columns={'index': OHLCVUDEnum.DATETIME.value}, inplace=True)
         candle_df[OHLCVUDEnum.DATETIME.value] = pd.to_datetime(candle_df[OHLCVUDEnum.DATETIME.value])
@@ -66,26 +82,19 @@ class Renko(Instrument):
         return candle_df
 
 
-    # Chained Setters
-    @brick_size.setter
-    def brick_size(self, brick_size: int) -> 'Renko':
-        self.__brick_size = brick_size
-        return self
-
-
-    # Public Methods
-    def get_renko(self) -> pd.DataFrame:
+    @cached_property
+    def renko_df(self) -> pd.DataFrame:
         """
         Returns the renko dataframe for the instrument symbol
 
         :return: pd.DataFrame containing renko data
         :rtype: pd.DataFrame
         """
-        renko_df: pd.DataFrame = pd.DataFrame(columns=Renko._RenkoColumnHeaders, data=None)
-        renko_df.loc[0, :] = self.__get_initial_uptrend_renko_brick()
+        rdf: pd.DataFrame = pd.DataFrame(columns=Renko._RenkoColumnHeaders, data=None)
+        rdf.loc[0, :] = self.__get_initial_uptrend_renko_brick()
         
         for _, candle in self.source_candle_df.iterrows():
-            prev_renko_brick: pd.Series = renko_df.iloc[-1]
+            prev_renko_brick: pd.Series = rdf.iloc[-1]
             
             curr_candle_date: pd.Timestamp   = pd.Timestamp(candle[OHLCVUDEnum.DATETIME.value])
             curr_candle_close: float         = float(candle[OHLCVUDEnum.CLOSE.value])
@@ -110,12 +119,13 @@ class Renko(Instrument):
             
             if next_bricks:
                 df_of_next_bricks = pd.DataFrame(data=next_bricks, columns=Renko._RenkoColumnHeaders)
-                renko_df = pd.concat([renko_df, df_of_next_bricks], axis='index', ignore_index=True)
+                rdf = pd.concat([rdf, df_of_next_bricks], axis='index', ignore_index=True)
 
-        renko_df[OHLCVUDEnum.DATETIME.value] = pd.to_datetime(renko_df[OHLCVUDEnum.DATETIME.value])
-        return renko_df
+        rdf[OHLCVUDEnum.DATETIME.value] = pd.to_datetime(rdf[OHLCVUDEnum.DATETIME.value])
+        return rdf
 
     
+    # Private Methods
     def __get_brick_size_from_atr(
         self,
         candle_span: CandlespanEnum,
@@ -262,3 +272,13 @@ class Renko(Instrument):
             prev_renko_open += self.__brick_size
 
         return bricks
+    
+
+    @override
+    def _after_property_update(self) -> None:
+        """
+        Cleans up the renko_df attribute after any property update to ensure it is recalculated when needed.
+        """
+        super()._after_property_update()
+        self.__dict__.pop("renko_df", None)
+        self.__dict__.pop("source_candle_df", None)

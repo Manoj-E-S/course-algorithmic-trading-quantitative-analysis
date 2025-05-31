@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 class KpiCalculator:
     """
     A class to calculate various KPIs for the trading strategy.
@@ -8,173 +11,110 @@ class KpiCalculator:
 
 
     @staticmethod
-    def cagr(start_value: float, end_value: float, periods: int) -> float:
+    def cagr(start_price: float, end_price: float, periods: float) -> float:
         """
         Calculate the Compound Annual Growth Rate (CAGR).
 
-        :param start_value: The initial value of the investment.
-        :type start_value: float
+        :param start_price: The initial price of the investment.
+        :type start_price: float
 
-        :param end_value: The final value of the investment.
-        :type end_value: float
+        :param end_price: The final price of the investment.
+        :type end_price: float
 
         :param periods: The number of periods (years) over which the growth is calculated.
-        :type periods: int
+        :type periods: float
 
-        :return: The CAGR as a percentage.
+        :return: The CAGR as a fraction.
         :rtype: float
+
+        :raises ValueError: If start_price, end_price, or periods are less than or equal to zero.
         """
-        if start_value <= 0 or end_value <= 0 or periods <= 0:
-            raise ValueError("Start value, end value, and periods must be greater than zero.")
-        
-        return ((end_value / start_value) ** (1 / periods) - 1) * 100
+        if start_price <= 0 or end_price <= 0 or periods <= 0:
+            raise ValueError("Start price, end price, and periods must be greater than zero.")
+
+        return (end_price / start_price) ** (1 / periods) - 1
 
 
     @staticmethod
-    def profit_loss(entry_price: float, exit_price: float, quantity: float) -> float:
+    def non_annualized_volatility(returns_series: pd.Series, downside: bool = False) -> float:
         """
-        Calculate the profit or loss from a trade.
+        Calculate the volatility of a returns series.
 
-        :param entry_price: The price at which the asset was bought.
-        :type entry_price: float
+        :param returns_series: A pandas Series of returns for the asset.
+        :type returns_series: pd.Series
 
-        :param exit_price: The price at which the asset was sold.
-        :type exit_price: float
-
-        :param quantity: The number of units traded.
-        :type quantity: float
-
-        :return: The profit or loss from the trade.
+        :return: The volatility as a fraction.
         :rtype: float
         """
-        return (exit_price - entry_price) * quantity
-    
-
-    @staticmethod
-    def return_on_investment(entry_price: float, exit_price: float, quantity: float) -> float:
-        """
-        Calculate the return on investment (ROI) from a trade.
-
-        :param entry_price: The price at which the asset was bought.
-        :type entry_price: float
-
-        :param exit_price: The price at which the asset was sold.
-        :type exit_price: float
-
-        :param quantity: The number of units traded.
-        :type quantity: float
-
-        :return: The ROI as a percentage.
-        :rtype: float
-        """
-        profit_loss = KpiCalculator.profit_loss(entry_price, exit_price, quantity)
-        return (profit_loss / (entry_price * quantity)) * 100
-    
-
-    @staticmethod
-    def win_rate(trades: list[float]) -> float:
-        """
-        Calculate the win rate of a series of trades.
-
-        :param trades: A list of profit/loss values for each trade.
-        :type trades: list[float]
-
-        :return: The win rate as a percentage.
-        :rtype: float
-        """
-        if not trades:
+        if returns_series.empty:
             return 0.0
         
-        wins = sum(1 for trade in trades if trade > 0)
-        return (wins / len(trades)) * 100
-    
+        if downside:
+            negative_returns = returns_series[returns_series < 0]
+            if negative_returns.empty:
+                return 0.0
+            return negative_returns.std()
+
+        return returns_series.std()
+
 
     @staticmethod
-    def average_profit(trades: list[float]) -> float:
+    def sharpe_ratio(expected_returns: float, risk_free_rate: float, volatility: float) -> float:
         """
-        Calculate the average profit from a series of trades.
+        Calculate the Sharpe ratio.
 
-        :param trades: A list of profit/loss values for each trade.
-        :type trades: list[float]
-
-        :return: The average profit.
-        :rtype: float
-        """
-        if not trades:
-            return 0.0
-        
-        return sum(trades) / len(trades)
-    
-
-    @staticmethod
-    def max_drawdown(trades: list[float]) -> float:
-        """
-        Calculate the maximum drawdown from a series of trades.
-
-        :param trades: A list of profit/loss values for each trade.
-        :type trades: list[float]
-
-        :return: The maximum drawdown as a percentage.
-        :rtype: float
-        """
-        if not trades:
-            return 0.0
-        
-        max_drawdown = 0.0
-        peak = trades[0]
-        
-        for trade in trades:
-            if trade > peak:
-                peak = trade
-            drawdown = (peak - trade) / peak * 100
-            max_drawdown = max(max_drawdown, drawdown)
-        
-        return max_drawdown
-    
-
-    @staticmethod
-    def sharpe_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
-        """
-        Calculate the Sharpe ratio of a series of returns.
-
-        :param returns: A list of returns for each period.
-        :type returns: list[float]
+        :param expected_returns: The expected return of the investment.
+        :type expected_returns: float
 
         :param risk_free_rate: The risk-free rate of return.
         :type risk_free_rate: float
+
+        :param volatility: The volatility of the investment.
+        :type volatility: float
 
         :return: The Sharpe ratio.
         :rtype: float
         """
-        if not returns:
-            return 0.0
-
-        excess_returns = [r - risk_free_rate for r in returns]
-        return sum(excess_returns) / len(excess_returns)
+        return (expected_returns - risk_free_rate) / volatility if volatility else 0.0
 
 
     @staticmethod
-    def sortino_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
+    def sortino_ratio(expected_returns: float, risk_free_rate: float, downside_volatility: float) -> float:
         """
-        Calculate the Sortino ratio of a series of returns.
+        Calculate the Sortino ratio.
 
-        :param returns: A list of returns for each period.
-        :type returns: list[float]
+        :param expected_returns: The expected return of the investment.
+        :type expected_returns: float
 
         :param risk_free_rate: The risk-free rate of return.
         :type risk_free_rate: float
 
+        :param downside_volatility: The downside volatility of the investment.
+        :type downside_volatility: float
+
         :return: The Sortino ratio.
         :rtype: float
         """
-        if not returns:
+        return (expected_returns - risk_free_rate) / downside_volatility if downside_volatility else 0.0
+    
+
+    @staticmethod
+    def max_drawdown(cumulative_returns_series: pd.Series) -> float:
+        """
+        Calculate the maximum drawdown from a series of cumulative returns.
+
+        :param cumulative_returns_series: A pandas Series of cumulative returns for the asset.
+        :type cumulative_returns_series: pd.Series
+
+        :return: The maximum drawdown as a percentage.
+        :rtype: float
+        """
+        if cumulative_returns_series.empty:
             return 0.0
         
-        downside_returns = [r for r in returns if r < risk_free_rate]
-        downside_deviation = (sum((r - risk_free_rate) ** 2 for r in downside_returns) / len(downside_returns)) ** 0.5 if downside_returns else 0.0
-        
-        excess_returns = [r - risk_free_rate for r in returns]
-        return sum(excess_returns) / (downside_deviation if downside_deviation > 0 else 1)
+        cumulative_peaks = cumulative_returns_series.cummax()
+        fractional_drawdowns = (cumulative_peaks - cumulative_returns_series) / cumulative_peaks
+        return fractional_drawdowns.max()
     
 
     @staticmethod
@@ -196,125 +136,3 @@ class KpiCalculator:
         
         return annual_return / abs(max_drawdown)
     
-
-    @staticmethod
-    def alpha(returns: list[float], benchmark_returns: list[float], risk_free_rate: float = 0.0) -> float:
-        """
-        Calculate the alpha of a series of returns compared to a benchmark.
-
-        :param returns: A list of returns for the investment.
-        :type returns: list[float]
-
-        :param benchmark_returns: A list of returns for the benchmark.
-        :type benchmark_returns: list[float]
-
-        :param risk_free_rate: The risk-free rate of return.
-        :type risk_free_rate: float
-
-        :return: The alpha value.
-        :rtype: float
-        """
-        if not returns or not benchmark_returns:
-            return 0.0
-        
-        excess_returns = [r - risk_free_rate for r in returns]
-        excess_benchmark_returns = [b - risk_free_rate for b in benchmark_returns]
-        
-        return sum(excess_returns) - sum(excess_benchmark_returns)
-    
-
-    @staticmethod
-    def beta(returns: list[float], benchmark_returns: list[float]) -> float:
-        """
-        Calculate the beta of a series of returns compared to a benchmark.
-
-        :param returns: A list of returns for the investment.
-        :type returns: list[float]
-
-        :param benchmark_returns: A list of returns for the benchmark.
-        :type benchmark_returns: list[float]
-
-        :return: The beta value.
-        :rtype: float
-        """
-        if not returns or not benchmark_returns:
-            return 0.0
-        
-        covariance = sum((r - sum(returns) / len(returns)) * (b - sum(benchmark_returns) / len(benchmark_returns)) for r, b in zip(returns, benchmark_returns))
-        variance = sum((b - sum(benchmark_returns) / len(benchmark_returns)) ** 2 for b in benchmark_returns)
-        
-        return covariance / variance if variance != 0 else 0.0
-    
-
-    @staticmethod
-    def r_squared(returns: list[float], benchmark_returns: list[float]) -> float:
-        """
-        Calculate the R-squared value of a series of returns compared to a benchmark.
-
-        :param returns: A list of returns for the investment.
-        :type returns: list[float]
-
-        :param benchmark_returns: A list of returns for the benchmark.
-        :type benchmark_returns: list[float]
-
-        :return: The R-squared value.
-        :rtype: float
-        """
-        if not returns or not benchmark_returns:
-            return 0.0
-        
-        beta = KpiCalculator.beta(returns, benchmark_returns)
-        variance_benchmark = sum((b - sum(benchmark_returns) / len(benchmark_returns)) ** 2 for b in benchmark_returns)
-        
-        return beta * (sum((r - sum(returns) / len(returns)) ** 2 for r in returns) / variance_benchmark) if variance_benchmark != 0 else 0.0
-    
-
-    @staticmethod
-    def information_ratio(returns: list[float], benchmark_returns: list[float], risk_free_rate: float = 0.0) -> float:
-        """
-        Calculate the information ratio of a series of returns compared to a benchmark.
-
-        :param returns: A list of returns for the investment.
-        :type returns: list[float]
-
-        :param benchmark_returns: A list of returns for the benchmark.
-        :type benchmark_returns: list[float]
-
-        :param risk_free_rate: The risk-free rate of return.
-        :type risk_free_rate: float
-
-        :return: The information ratio.
-        :rtype: float
-        """
-        if not returns or not benchmark_returns:
-            return 0.0
-        
-        excess_returns = [r - risk_free_rate for r in returns]
-        excess_benchmark_returns = [b - risk_free_rate for b in benchmark_returns]
-        
-        tracking_error = (sum((er - eb) ** 2 for er, eb in zip(excess_returns, excess_benchmark_returns)) / len(excess_benchmark_returns)) ** 0.5
-        
-        return sum(excess_returns) / tracking_error if tracking_error != 0 else 0.0
-    
-
-    @staticmethod
-    def omega_ratio(returns: list[float], risk_free_rate: float = 0.0) -> float:
-        """
-        Calculate the Omega ratio of a series of returns.
-
-        :param returns: A list of returns for the investment.
-        :type returns: list[float]
-
-        :param risk_free_rate: The risk-free rate of return.
-        :type risk_free_rate: float
-
-        :return: The Omega ratio.
-        :rtype: float
-        """
-        if not returns:
-            return 0.0
-        
-        gains = sum(r for r in returns if r > risk_free_rate)
-        losses = abs(sum(r for r in returns if r < risk_free_rate))
-        
-        return gains / losses if losses != 0 else float('inf')

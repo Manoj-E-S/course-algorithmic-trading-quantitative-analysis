@@ -17,6 +17,11 @@ dependencies = [
 [tool.poetry]
 packages = [{include = "technical_analysis", from = "src"}]
 
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.34.0"
+
+[tool.poe.tasks]
+rm-pycache = { shell = "ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd) && find \"$ROOT\" -type d -name '__pycache__' -print0 | xargs -0 rm -rf && find \"$ROOT\" -type f \\( -name '*.pyc' -o -name '*.pyo' \\) -print0 | xargs -0 rm -f" }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -63,7 +63,7 @@ class InstrumentGroupVisualizer:
         for i in range(n, len(axes)):
             fig.delaxes(axes[i])
 
-        fig.suptitle(title if title else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} returns")
+        fig.suptitle(title if title else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} returns")
         fig.tight_layout()
         fig.subplots_adjust(top=0.85, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
         fig.autofmt_xdate(ha='center', rotation=70)
@@ -71,7 +71,7 @@ class InstrumentGroupVisualizer:
         for i, symbol in enumerate(self.instrument_group.instrument_symbols):  
             axes[i].set_title(symbol)
             axes[i].set_xlabel('Date')
-            axes[i].set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} returns")
+            axes[i].set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} returns")
 
             axes[i].plot(df.index, df[symbol], label=symbol)
             
@@ -109,7 +109,7 @@ class InstrumentGroupVisualizer:
         for i in range(n, len(axes)):
             fig.delaxes(axes[i])
 
-        fig.suptitle(title if title else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} volume changes")
+        fig.suptitle(title if title else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} volume changes")
         fig.tight_layout()
         fig.subplots_adjust(top=0.85, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
         fig.autofmt_xdate(ha='center', rotation=70)
@@ -117,7 +117,7 @@ class InstrumentGroupVisualizer:
         for i, symbol in enumerate(self.instrument_group.instrument_symbols):  
             axes[i].set_title(symbol)
             axes[i].set_xlabel('Date')
-            axes[i].set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} volume changes")
+            axes[i].set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} volume changes")
 
             axes[i].bar(df.index, df[symbol], label=symbol, width=35, color='orange')
             
@@ -156,9 +156,9 @@ class InstrumentGroupVisualizer:
         fig.subplots_adjust(top=0.85, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
         fig.autofmt_xdate(ha='center', rotation=70)
         
-        ax1.set_title(f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} returns")
+        ax1.set_title(f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} returns")
         ax1.set_xlabel('Date')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} returns")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} returns")
 
         ax1.plot(df.index, df[instrument_symbol], label=instrument_symbol)
         
@@ -197,9 +197,9 @@ class InstrumentGroupVisualizer:
         fig.subplots_adjust(top=0.85, left=0.05, right=0.95, hspace=0.3, wspace=0.2)
         fig.autofmt_xdate(ha='center', rotation=70)
 
-        ax1.set_title(f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} volume changes")
+        ax1.set_title(f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} volume changes")
         ax1.set_xlabel('Date')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()}{' cumulative' if cumulative else ''} volume changes")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()}{' cumulative' if cumulative else ''} volume changes")
 
         ax1.plot(df.index, df[instrument_symbol], label=instrument_symbol)
         
@@ -227,13 +227,13 @@ class InstrumentGroupVisualizer:
         avg_returns = self.instrument_group.returns_df.mean(axis=0)
 
         fig, ax1 = plt.subplots(figsize=(10, 6))
-        fig.suptitle(title if title else f"Average {self.instrument_group.candle_span.lower()} returns")
+        fig.suptitle(title if title else f"Average {self.instrument_group.candle_span.value.lower()} returns")
         fig.tight_layout()
         fig.subplots_adjust(top=0.9, bottom=0.25, left=0.1, right=0.9, hspace=0.3, wspace=0.2)
         
         ax1.bar(avg_returns.index, avg_returns.values)
         ax1.set_xlabel('Instrument')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()} returns")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()} returns")
 
         plt.xticks(rotation=45)
         plt.show()
@@ -256,13 +256,13 @@ class InstrumentGroupVisualizer:
         avg_volume_changes = self.instrument_group.volume_change_df.mean(axis=0)
 
         fig, ax1 = plt.subplots(figsize=(10, 6))
-        fig.suptitle(title if title else f"Average {self.instrument_group.candle_span.lower()} volume changes")
+        fig.suptitle(title if title else f"Average {self.instrument_group.candle_span.value.lower()} volume changes")
         fig.tight_layout()
         fig.subplots_adjust(top=0.9, bottom=0.25, left=0.1, right=0.9, hspace=0.3, wspace=0.2)
         
         ax1.bar(avg_volume_changes.index, avg_volume_changes.values)
         ax1.set_xlabel('Instrument')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()} volume changes")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()} volume changes")
 
         plt.xticks(rotation=45)
         plt.show()
@@ -291,7 +291,7 @@ class InstrumentGroupVisualizer:
         
         ax1.bar(std_of_returns.index, std_of_returns.values)
         ax1.set_xlabel('Instrument')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()} returns")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()} returns")
         
         plt.xticks(rotation=45)
         plt.show()
@@ -317,7 +317,7 @@ class InstrumentGroupVisualizer:
         std_returns = df.std(axis=0)
 
         fig, ax1 = plt.subplots(figsize=(10, 6))
-        fig.suptitle(title if title else f"Average and standard deviation of {self.instrument_group.candle_span.lower()} returns")
+        fig.suptitle(title if title else f"Average and standard deviation of {self.instrument_group.candle_span.value.lower()} returns")
         fig.tight_layout()
         fig.subplots_adjust(top=0.9, bottom=0.25, left=0.1, right=0.9, hspace=0.3, wspace=0.2)
         
@@ -328,7 +328,7 @@ class InstrumentGroupVisualizer:
         ax1.bar(x + bar_width / 2, std_returns.values, width=bar_width, label='Volatility (std dev)')
 
         ax1.set_xlabel('Instrument')
-        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.capitalize()} returns")
+        ax1.set_ylabel(ylabel if ylabel else f"{self.instrument_group.candle_span.value.capitalize()} returns")
 
         ax1.set_xticks(x)
         ax1.set_xticklabels(mean_returns.index)

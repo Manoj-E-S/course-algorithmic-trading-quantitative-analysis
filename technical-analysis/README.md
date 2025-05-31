@@ -1,14 +1,12 @@
-```
-Note: Run all python commands in this (technical-analysis/) directory only
-```
+`Note: Run all python commands in this (technical-analysis/) directory only`
 
 Activate poetry environment
-On Linux: `eval $(poetry env activate)`
+1. On Linux: 
+```
+eval $(poetry env activate)
+```
 
-run 
-`alias rm-pycache-in-current-dir='find . | grep -E "(/__pycache__$|\.pyc$|\.pyo$)" | xargs rm -rf'`
-
-and 
-`rm-pycache-in-current-dir`
-
-to remove `__pycache__/`
+To remove all `__pycache__/` directories created after a python script is run:
+```
+poetry run poe rm-pycache
+```

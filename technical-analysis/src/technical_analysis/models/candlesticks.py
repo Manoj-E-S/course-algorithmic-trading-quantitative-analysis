@@ -1,8 +1,10 @@
+from functools import cached_property
 import pandas as pd
 
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.providers.data_view import DataViewProvider
+from technical_analysis.utils.decorators import override
 
 
 class Candlesticks(Instrument):
@@ -19,8 +21,9 @@ class Candlesticks(Instrument):
         super().__init__(instrument_symbol, candle_span, data_view_provider)
 
 
-    # Public Methods
-    def get_candlesticks(self) -> pd.DataFrame:
+    # Cached Properties
+    @cached_property
+    def candle_df(self) -> pd.DataFrame:
         """
         Returns the candlesticks dataframe.
         """

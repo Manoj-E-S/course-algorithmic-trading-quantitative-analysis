@@ -1,6 +1,8 @@
+from functools import cached_property
 import pandas as pd
 
 from technical_analysis.enums.candlespan import CandlespanEnum
+from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.providers.data_view import DataViewProvider
 from technical_analysis.utils.decorators import optionally_overridable
 
@@ -21,36 +23,44 @@ class Instrument:
 
         self._raise_if_invalid_instrument(instrument_symbol)
         self._instrument_symbol: str = instrument_symbol
-        
-        self._after_property_update()
 
 
     # Getters
     @property
-    def candle_span(self) -> str:
-        return self._candle_span.value
+    def candle_span(self) -> CandlespanEnum:
+        return self._candle_span
 
     @property
     def instrument_symbol(self) -> str:
         return self._instrument_symbol
     
-    @property
+    @cached_property
     def ohlcv_df(self) -> pd.DataFrame:
-        return self._df
+        return self._views.instrument_ohlcv_view(self._candle_span, self._instrument_symbol)
+
+    @cached_property
+    def returns_series(self) -> pd.Series:
+        return self._views.instrument_returns_view(self._candle_span, self._instrument_symbol)
+
+    @cached_property
+    def cumulative_returns_series(self) -> pd.Series:
+        return self._views.instrument_cumulative_returns_view(self._candle_span, self._instrument_symbol)
     
 
     # Chainable Setters
     @candle_span.setter
     def candle_span(self, candle_span: CandlespanEnum) -> 'Instrument':
-        self._candle_span = candle_span
-        self._after_property_update()
+        if self._candle_span != candle_span:
+            self._candle_span = candle_span
+            self._after_property_update()
         return self
 
     @instrument_symbol.setter
     def instrument_symbol(self, instrument_symbol: str) -> 'Instrument':
-        self._raise_if_invalid_instrument(instrument_symbol)
-        self._instrument_symbol = instrument_symbol
-        self._after_property_update()
+        if self._instrument_symbol != instrument_symbol:
+            self._raise_if_invalid_instrument(instrument_symbol)
+            self._instrument_symbol = instrument_symbol
+            self._after_property_update()
         return self
 
 
@@ -77,13 +87,15 @@ class Instrument:
         """
         Perform actions after any properties in the base/subclass are updated.
         
-        In Base Class: 
-            sets the ohlcv_df for the current instrument symbol and candle span.
+        In Base Class (Instrument): 
+            Invalidates cached properties related to OHLCV data, returns, and cumulative returns.
         
         In Subclass:
-            May be overridden to perform additional actions after property updates.
+            May be overridden to perform additional/new actions after property updates.
         
         :return: None
         :rtype: None
         """
-        self._df = self._views.instrument_ohlcv_view(self._candle_span, self._instrument_symbol)
+        self.__dict__.pop("ohlcv_df", None)
+        self.__dict__.pop("returns_series", None)
+        self.__dict__.pop("cumulative_returns_series", None)

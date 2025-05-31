@@ -29,9 +29,9 @@ class TechniCharter:
         self.__instrument: Instrument = source_instrument
 
         if isinstance(self.__instrument, Candlesticks):
-            self.__df: pd.DataFrame = self.__instrument.get_candlesticks()
+            self.__df: pd.DataFrame = self.__instrument.candle_df
         elif isinstance(self.__instrument, Renko):
-            self.__df: pd.DataFrame = self.__instrument.get_renko()
+            self.__df: pd.DataFrame = self.__instrument.renko_df
         else:
             raise TypeError("TechniCharter support is currently limited to Candlesticks and Renko.")
         

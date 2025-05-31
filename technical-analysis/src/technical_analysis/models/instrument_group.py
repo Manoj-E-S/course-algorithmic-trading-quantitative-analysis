@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Literal
 
 import pandas as pd
@@ -34,9 +35,9 @@ class InstrumentGroup:
     
     # Getters
     @property
-    def candle_span(self) -> str:
-        return self.__candle_span.value
-    
+    def candle_span(self) -> CandlespanEnum:
+        return self.__candle_span
+
     @property
     def instrument_symbols(self) -> list[str]:
         return self.__instrument_symbols
@@ -45,25 +46,29 @@ class InstrumentGroup:
     # Chainable Setters
     @candle_span.setter
     def candle_span(self, candle_span: CandlespanEnum) -> 'InstrumentGroup':
-        self.__candle_span = candle_span
+        if self.__candle_span != candle_span:
+            self.__candle_span = candle_span
+            self.__invalidate_cached_properties()
         return self
 
     @instrument_symbols.setter
     def instrument_symbols(self, instrument_symbols: list[str]) -> 'InstrumentGroup':
-        self.__instrument_symbols = instrument_symbols
+        if self.__instrument_symbols != instrument_symbols:
+            self.__instrument_symbols = self.__filter_valid_instruments(instrument_symbols)
+            self.__invalidate_cached_properties()
         return self
 
 
     # Comparative Dataframes
-    @property
+    @cached_property
     def closes_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and close prices as the cell-data
         """
         return self.__views.instrument_group_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
-    
 
-    @property
+
+    @cached_property
     def volume_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume as the cell-data
@@ -71,7 +76,7 @@ class InstrumentGroup:
         return self.__views.instrument_group_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
 
 
-    @property
+    @cached_property
     def returns_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and returns as the cell-data
@@ -79,7 +84,7 @@ class InstrumentGroup:
         return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
 
 
-    @property
+    @cached_property
     def volume_change_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume change as the cell-data
@@ -87,7 +92,7 @@ class InstrumentGroup:
         return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
 
 
-    @property
+    @cached_property
     def cumulative_returns_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative returns as the cell-data
@@ -95,7 +100,7 @@ class InstrumentGroup:
         return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
 
 
-    @property
+    @cached_property
     def cumulative_volume_change_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative volume change as the cell-data
@@ -268,3 +273,18 @@ class InstrumentGroup:
             
         else:
             raise ValueError(unsupported_operation_type_err_msg)
+        
+
+    def __invalidate_cached_properties(self) -> None:
+        """
+        Invalidates all cached properties.
+
+        :return: None
+        :rtype: None
+        """
+        self.__dict__.pop('closes_df', None)
+        self.__dict__.pop('returns_df', None)
+        self.__dict__.pop('cumulative_returns_df', None)
+        self.__dict__.pop('volume_df', None)
+        self.__dict__.pop('volume_change_df', None)
+        self.__dict__.pop('cumulative_volume_change_df', None)
