@@ -1,13 +1,14 @@
 from technical_analysis.providers.data_cleaning import DataCleaningProvider
 from technical_analysis.providers.data_view import DataViewProvider
-from technical_analysis.visualization.kpis import InstrumentKPIs
-from technical_analysis.visualization.uni_instrument import InstrumentCharter
-from technical_analysis.visualization.multi_instrument import InstrumentGroupVisualizer
+from technical_analysis.kpis.instrument_kpi import InstrumentKPI
+from technical_analysis.visualization.instrument_group_kpi_plotter import InstrumentGroupKpiPlotter
+from technical_analysis.visualization.instrument_indicators_plotter import InstrumentIndicatorsPlotter
+from technical_analysis.visualization.instrument_plotter import InstrumentPlotter
+from technical_analysis.visualization.instrument_group_plotter import InstrumentGroupPlotter
 from technical_analysis.caching.response_cacher import ResponseCacher
-from technical_analysis.visualization.technical_indicators import TechniCharter
+from technical_analysis.indicators.instrument_indicators import InstrumentIndicators
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.enums.api_source import ApiSourceEnum
-from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument_group import InstrumentGroup
 from technical_analysis.models.renko import Renko
 
@@ -86,9 +87,9 @@ if __name__ == "__main__":
 
 
     """
-    Uncomment the following lines to see the usage of InstrumentGroupVisualizer
+    Uncomment the following lines to see the usage of InstrumentGroupPlotter
     """
-    # daily_indian_instrument_group_visualizer: InstrumentGroupVisualizer = InstrumentGroupVisualizer(daily_indian_instruments_group)
+    # daily_indian_instrument_group_visualizer: InstrumentGroupPlotter = InstrumentGroupPlotter(daily_indian_instruments_group)
     
     # daily_indian_instrument_group_visualizer.plot_returns_of_all_instruments(
     #     cumulative=False,
@@ -120,28 +121,37 @@ if __name__ == "__main__":
 
 
     """
-    Uncomment the following lines to see usage of TechniCharter and InstrumentKPIs
+    Uncomment the following lines to see usage of InstrumentIndicators and InstrumentKPI
     """
-    technical_indicators_for_all_instruments: dict[str, TechniCharter] = {}
-    kpis_for_all_instruments: dict[str, InstrumentKPIs] = {}
+    technical_indicators_for_all_instruments: dict[str, InstrumentIndicators] = {}
+    technical_indicator_plotters: dict[str, InstrumentIndicatorsPlotter] = {}
+    kpis_for_all_instruments: dict[str, InstrumentKPI] = {}
 
 
     # With Candlesticks as the Instrument
     for candlestick in daily_indian_instruments_group.as_candlesticks().values():
-        technical_indicators_for_all_instruments[candlestick.instrument_symbol] = TechniCharter(candlestick)
-        kpis_for_all_instruments[candlestick.instrument_symbol] = InstrumentKPIs(candlestick)
+        technical_indicators_for_all_instruments[candlestick.instrument_symbol] = InstrumentIndicators(candlestick)
+        technical_indicator_plotters[candlestick.instrument_symbol] = InstrumentIndicatorsPlotter(candlestick)
+        kpis_for_all_instruments[candlestick.instrument_symbol] = InstrumentKPI(candlestick)
 
-    # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
-    #     technical_indicator.macd().plot_macd()
-    #     technical_indicator.atr().plot_atr()
-    #     technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
-    #     technical_indicator.rsi().plot_rsi()
-    #     technical_indicator.adx().plot_adx()
+    for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
+        technical_indicator.macd()
+        technical_indicator.atr()
+        technical_indicator.bollinger_bands()
+        technical_indicator.rsi()
+        technical_indicator.adx()
+        print(f"Indicator-Augmented Dataframe for {symbol}:")
+        print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
 
-    #     print(f"Indicator-Augmented Dataframe for {symbol}:")
-    #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
+    # for symbol, technical_indicator_plotter in technical_indicator_plotters.items():
+    #     technical_indicator_plotter.plot_macd()
+    #     technical_indicator_plotter.plot_atr()
+    #     technical_indicator_plotter.plot_bollinger_bands(should_plot_band_width=False)
+    #     technical_indicator_plotter.plot_rsi()
+    #     technical_indicator_plotter.plot_adx()
 
     for symbol, kpi in kpis_for_all_instruments.items():
+        print()
         print(f"Instrument Symbol: {symbol}, Candle Span: {kpi.instrument.candle_span.value}")
         print("==============================================================")
         print(f"CAGR: {kpi.cagr()}")
@@ -153,23 +163,30 @@ if __name__ == "__main__":
         print()
 
 
-
-    # # With Renko as the Instrument
+    # With Renko as the Instrument
     for renko in daily_indian_instruments_group.as_renkos(brick_size_from_atr=brick_size_from_atr).values():
-        technical_indicators_for_all_instruments[renko.instrument_symbol] = TechniCharter(renko)
-        kpis_for_all_instruments[renko.instrument_symbol] = InstrumentKPIs(renko)
+        technical_indicators_for_all_instruments[renko.instrument_symbol] = InstrumentIndicators(renko)
+        technical_indicator_plotters[renko.instrument_symbol] = InstrumentIndicatorsPlotter(renko)
+        kpis_for_all_instruments[renko.instrument_symbol] = InstrumentKPI(renko)
 
-    # for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
-    #     technical_indicator.macd().plot_macd()
-    #     technical_indicator.atr().plot_atr()
-    #     technical_indicator.bollinger_bands().plot_bollinger_bands(should_plot_band_width=False)
-    #     technical_indicator.rsi().plot_rsi()
-    #     technical_indicator.adx().plot_adx()
+    for symbol, technical_indicator in technical_indicators_for_all_instruments.items():
+        technical_indicator.macd()
+        technical_indicator.atr()
+        technical_indicator.bollinger_bands()
+        technical_indicator.rsi()
+        technical_indicator.adx()
+        print(f"Indicator-Augmented Dataframe for {symbol}:")
+        print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
 
-    #     print(f"Indicator-Augmented Dataframe for {symbol}:")
-    #     print(technical_indicators_for_all_instruments[symbol].collect_as_dataframe())
+    # for symbol, technical_indicator_plotter in technical_indicator_plotters.items():
+    #     technical_indicator_plotter.plot_macd()
+    #     technical_indicator_plotter.plot_atr()
+    #     technical_indicator_plotter.plot_bollinger_bands(should_plot_band_width=False)
+    #     technical_indicator_plotter.plot_rsi()
+    #     technical_indicator_plotter.plot_adx()
     
     for symbol, kpi in kpis_for_all_instruments.items():
+        print()
         print(f"Instrument Symbol: {symbol}, Candle Span: {kpi.instrument.candle_span.value}")
         print("==============================================================")
         print(f"CAGR: {kpi.cagr()}")
@@ -181,27 +198,38 @@ if __name__ == "__main__":
         print()
 
 
+    """
+    Uncomment the following lines to see usage of follInstrumentGroupKpiPlotter
+    """
+    # instrument_group_kpi_plotter = InstrumentGroupKpiPlotter(daily_indian_instruments_group)
+    # instrument_group_kpi_plotter.plot_cagrs()
+    # instrument_group_kpi_plotter.plot_volatilities()
+    # instrument_group_kpi_plotter.plot_cagr_vs_volatility()
+    # instrument_group_kpi_plotter.plot_sharpe_ratios()
+    # instrument_group_kpi_plotter.plot_sortino_ratios()
+    # instrument_group_kpi_plotter.plot_max_drawdowns()
+    # instrument_group_kpi_plotter.plot_calmar_ratios()
 
     """
-    Uncomment the following lines to see usage of InstrumentCharter
+    Uncomment the following lines to see usage of InstrumentPlotter
     """
-    # instrument_charters: dict[str, InstrumentCharter] = {}
+    # instrument_plotters: dict[str, InstrumentPlotter] = {}
 
 
     # # With Candlesticks as the Instrument
     # for candlestick in daily_indian_instruments_group.as_candlesticks().values():
-    #     instrument_charters[candlestick.instrument_symbol] = InstrumentCharter(candlestick)
+    #     instrument_plotters[candlestick.instrument_symbol] = InstrumentPlotter(candlestick)
 
-    # for symbol, charter in instrument_charters.items():
+    # for symbol, charter in instrument_plotters.items():
     #     charter.plot_price_line()
     #     charter.plot_volume_bar()
 
 
     # # With Renko as the Instrument  
     # for renko in daily_indian_instruments_group.as_renkos(brick_size=brick_size).values():
-    #     instrument_charters[renko.instrument_symbol] = InstrumentCharter(renko)
+    #     instrument_plotters[renko.instrument_symbol] = InstrumentPlotter(renko)
 
-    # for symbol, charter in instrument_charters.items():
+    # for symbol, charter in instrument_plotters.items():
     #     charter.plot_price_line()
     #     # TODO: Extend Volume support to Renko
     #     # charter.plot_volume_bar()

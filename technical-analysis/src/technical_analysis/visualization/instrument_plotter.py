@@ -12,7 +12,7 @@ from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.renko import Renko
 
 
-class InstrumentCharter:
+class InstrumentPlotter:
     """
     A component to plot the price/volume charts of an instrument in different formats
     """
@@ -31,7 +31,7 @@ class InstrumentCharter:
         elif isinstance(source_instrument, Renko):
             self.__df = source_instrument.renko_df
         else:
-            raise TypeError("InstrumentCharter support is currently limited to Candlesticks and Renko.")
+            raise TypeError("InstrumentPlotter support is currently limited to Candlesticks and Renko.")
 
 
     # Getters
@@ -42,7 +42,7 @@ class InstrumentCharter:
 
     # Chainable Setters
     @instrument.setter
-    def instrument(self, source_instrument: Instrument) -> 'InstrumentCharter':
+    def instrument(self, source_instrument: Instrument) -> 'InstrumentPlotter':
         self.__instrument = source_instrument
         return self
 

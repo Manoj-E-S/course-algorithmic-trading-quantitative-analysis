@@ -3,6 +3,7 @@ import os
 import json
 import time
 
+from technical_analysis.config.paths import PathConfigurations
 from technical_analysis.enums.api import APIEnum
 from technical_analysis.utils.singleton import SingletonMeta
 
@@ -12,7 +13,7 @@ class ResponseCacher(metaclass=SingletonMeta):
     A component to cache API responses of APIs
     """
 
-    RESPONSE_CACHE_DIR: str = os.path.join(os.getcwd(), "response_cache")
+    RESPONSE_CACHE_DIR: str = os.path.join(PathConfigurations.PROJECT_ROOT, "response_cache")
     CACHE_THRESHOLD_PERIOD: datetime.timedelta = datetime.timedelta(days=5)
 
 
@@ -20,13 +21,48 @@ class ResponseCacher(metaclass=SingletonMeta):
         pass
 
 
+    # Getters
     def get_cache_threshold_period(self) -> datetime.timedelta:
         return self.CACHE_THRESHOLD_PERIOD
+    
+    def get_response_cache_dir(self) -> str:
+        return self.RESPONSE_CACHE_DIR
 
+
+    # Setters
     def set_cache_threshold_period(self, cache_threshold_period_days: int) -> None:
         self.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
 
+    def set_response_cache_dir(self, response_cache_dir: str) -> None:
+        self.RESPONSE_CACHE_DIR = response_cache_dir
 
+
+    # Reset Methods
+    def reset_cache_threshold_period(self) -> None:
+        """
+        Resets the cache threshold period to the default value of 5 days
+        """
+        self.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=5)
+        print(f"[INFO] Cache threshold period reset to {self.CACHE_THRESHOLD_PERIOD}")
+
+
+    def reset_response_cache_dir(self) -> None:
+        """
+        Resets the response cache directory to the default value
+        """
+        self.RESPONSE_CACHE_DIR = os.path.join(PathConfigurations.PROJECT_ROOT, "response_cache")
+        print(f"[INFO] Response cache directory reset to {self.RESPONSE_CACHE_DIR}")
+
+
+    def reset_config(self) -> None:
+        """
+        Resets all cache configurations to their default values
+        """
+        self.reset_cache_threshold_period()
+        self.reset_response_cache_dir()
+
+
+    # Public Methods
     def cache_response_data(
         self,
         which_api: APIEnum,

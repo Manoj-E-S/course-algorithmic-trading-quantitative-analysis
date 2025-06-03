@@ -11,17 +11,17 @@ import matplotlib.dates as mdates
 from technical_analysis.models.instrument_group import InstrumentGroup
 
 
-class InstrumentGroupVisualizer:
+class InstrumentGroupPlotter:
     """
     Visualizes Comparative Returns and Volume Changes of Instruments in an Instrument Group
     """
 
     def __init__(
         self,
-        financial_instrument_group: InstrumentGroup
+        instrument_group: InstrumentGroup
     ):
-        self.__instrument_group: InstrumentGroup = financial_instrument_group
-    
+        self.__instrument_group: InstrumentGroup = instrument_group
+
 
     # Getters
     @property
@@ -31,7 +31,7 @@ class InstrumentGroupVisualizer:
 
     # Chainable Setter
     @instrument_group.setter
-    def instrument_group(self, instrument_group: InstrumentGroup) -> 'InstrumentGroupVisualizer':
+    def instrument_group(self, instrument_group: InstrumentGroup) -> 'InstrumentGroupPlotter':
         self.__instrument_group = instrument_group
         return self
     

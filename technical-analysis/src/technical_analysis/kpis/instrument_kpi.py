@@ -7,7 +7,7 @@ from technical_analysis.kpis.kpi_calculator import KpiCalculator
 from technical_analysis.models.instrument import Instrument
 
 
-class InstrumentKPIs:
+class InstrumentKPI:
     """
     A class to represent key performance indicators (KPIs) for a financial instrument.
     """
@@ -31,7 +31,7 @@ class InstrumentKPIs:
 
     # Chainable Setters   
     @instrument.setter
-    def instrument(self, instrument: Instrument) -> 'InstrumentKPIs':
+    def instrument(self, instrument: Instrument) -> 'InstrumentKPI':
         self.__instrument = instrument
         self.__after_property_update()
         return self

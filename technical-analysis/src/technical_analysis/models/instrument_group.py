@@ -6,6 +6,7 @@ import pandas as pd
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.renko import Renko
 from technical_analysis.providers.data_view import DataViewProvider
 from technical_analysis.utils.decorators import mutually_exclusive_args
@@ -109,6 +110,13 @@ class InstrumentGroup:
 
 
     # Public Methods
+    def as_instruments(self) -> dict[str, Instrument]:
+        return {
+            instrument_symbol: Instrument(instrument_symbol, self.__candle_span, self.__views)
+            for instrument_symbol in self.__instrument_symbols
+        }
+    
+
     def as_candlesticks(self) -> dict[str, Candlesticks]:
         return {
             instrument_symbol: Candlesticks(instrument_symbol, self.__candle_span, self.__views)
@@ -126,6 +134,34 @@ class InstrumentGroup:
             instrument_symbol: Renko(instrument_symbol, self.__candle_span, self.__views, brick_size_from_atr, brick_size)
             for instrument_symbol in self.__instrument_symbols
         }
+    
+
+    def get_instrument(self, instrument_symbol: str) -> Instrument | None:
+        return Instrument(instrument_symbol, self.__candle_span, self.__views) if self.is_instrument_available(instrument_symbol) else None
+
+
+    def get_instrument_candlesticks(self, instrument_symbol: str) -> Candlesticks | None:
+        return Candlesticks(instrument_symbol, self.__candle_span, self.__views) if self.is_instrument_available(instrument_symbol) else None
+
+
+    @mutually_exclusive_args("brick_size_from_atr", "brick_size")
+    def get_instrument_renko(
+        self, 
+        instrument_symbol: str, 
+        brick_size_from_atr: tuple[CandlespanEnum, Renko._NumberOfPeriodsType] | None = None,
+        brick_size: int | None = None
+    ) -> Renko | None:
+        return Renko(
+            instrument_symbol,
+            self.__candle_span,
+            self.__views,
+            brick_size_from_atr,
+            brick_size
+        ) if self.is_instrument_available(instrument_symbol) else None
+    
+
+    def is_instrument_available(self, instrument_symbol: str) -> bool:
+        return instrument_symbol in self.__instrument_symbols
     
 
     def add_instrument(self, instrument_symbol: str) -> 'InstrumentGroup':

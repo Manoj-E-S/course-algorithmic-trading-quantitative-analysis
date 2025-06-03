@@ -64,7 +64,7 @@ class IndicatorCalculator:
         df["H-L"]   = df[OHLCVUDEnum.HIGH.value] - df[OHLCVUDEnum.LOW.value]
         df["H-PC"]  = (df[OHLCVUDEnum.HIGH.value] - df[OHLCVUDEnum.CLOSE.value].shift(1)).abs()
         df["L-PC"]  = (df[OHLCVUDEnum.LOW.value] - df[OHLCVUDEnum.CLOSE.value].shift(1)).abs()
-        df["TR"]    = df[["H-L", "H-PC", "L-PC"]].max(axis='columns', skipna=False)
+        df["TR"]    = df[["H-L", "H-PC", "L-PC"]].max(axis='columns')
         df["atr"]   = df["TR"].ewm(span=window, min_periods=window).mean()
 
         df.drop(columns=["H-L", "H-PC", "L-PC", "TR"], inplace=True)
