@@ -1,9 +1,9 @@
 import pandas as pd
 
+from technical_analysis.config.data_view_config import GlobalDataViewConfig
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.providers.data_view import DataViewProvider
-from technical_analysis.utils.decorators import override
 
 
 class Candlesticks(Instrument):
@@ -15,7 +15,7 @@ class Candlesticks(Instrument):
         self,
         instrument_symbol: str,
         candle_span: CandlespanEnum,
-        data_view_provider: DataViewProvider,
+        data_view_provider: DataViewProvider | None = None
     ):
         super().__init__(instrument_symbol, candle_span, data_view_provider)
 

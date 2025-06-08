@@ -1,8 +1,9 @@
 from functools import cached_property
+
 import pandas as pd
 
+from technical_analysis.config.data_view_config import GlobalDataViewConfig
 from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.providers.data_view import DataViewProvider
 from technical_analysis.utils.decorators import optionally_overridable
 
@@ -16,8 +17,13 @@ class Instrument:
         self,
         instrument_symbol: str,
         candle_span: CandlespanEnum,
-        data_view_provider: DataViewProvider
+        data_view_provider: DataViewProvider | None = None
     ):
+        if data_view_provider is None:
+            data_view_provider = GlobalDataViewConfig().get()
+            if data_view_provider is None:
+                raise ValueError("No DataViewProvider configured globally or custom provided while instantiating Instrument or its subclasses.")
+
         self._views: DataViewProvider = data_view_provider
         self._candle_span: CandlespanEnum = candle_span
 

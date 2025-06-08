@@ -3,7 +3,7 @@ import os
 import json
 import time
 
-from technical_analysis.config.paths import PathConfigurations
+from technical_analysis.config.default_config import DefaultConfigConstants
 from technical_analysis.enums.api import APIEnum
 from technical_analysis.utils.singleton import SingletonMeta
 
@@ -13,8 +13,8 @@ class ResponseCacher(metaclass=SingletonMeta):
     A component to cache API responses of APIs
     """
 
-    RESPONSE_CACHE_DIR: str = os.path.join(PathConfigurations.PROJECT_ROOT, "response_cache")
-    CACHE_THRESHOLD_PERIOD: datetime.timedelta = datetime.timedelta(days=5)
+    __RESPONSE_CACHE_DIR: str = DefaultConfigConstants.DEFAULT_RESPONSE_CACHE_DIR
+    __CACHE_THRESHOLD_PERIOD: datetime.timedelta = DefaultConfigConstants.DEFAULT_CACHE_THRESHOLD_PERIOD_DAYS
 
 
     def __init__(self):
@@ -23,43 +23,64 @@ class ResponseCacher(metaclass=SingletonMeta):
 
     # Getters
     def get_cache_threshold_period(self) -> datetime.timedelta:
-        return self.CACHE_THRESHOLD_PERIOD
+        return self.__CACHE_THRESHOLD_PERIOD
     
     def get_response_cache_dir(self) -> str:
-        return self.RESPONSE_CACHE_DIR
+        return self.__RESPONSE_CACHE_DIR
 
 
     # Setters
-    def set_cache_threshold_period(self, cache_threshold_period_days: int) -> None:
-        self.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
+    def set_cache_threshold_period(self, cache_threshold_period_days: int) -> 'ResponseCacher':
+        if cache_threshold_period_days <= 0:
+            raise ValueError("The response cache threshold period must be a positive integer representing days.")
+        
+        self.__CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=cache_threshold_period_days)
+        return self
 
-    def set_response_cache_dir(self, response_cache_dir: str) -> None:
-        self.RESPONSE_CACHE_DIR = response_cache_dir
+
+    def set_response_cache_dir(self, response_cache_dir: str) -> 'ResponseCacher':
+        if os.path.exists(response_cache_dir):
+            if not os.path.isdir(response_cache_dir):
+                raise ValueError(f"The provided response cache directory '{response_cache_dir}' is not a valid directory.")
+            if not os.access(response_cache_dir, os.W_OK):
+                raise PermissionError(f"The provided response cache directory '{response_cache_dir}' is not writable.")
+            if not os.access(response_cache_dir, os.R_OK):
+                raise PermissionError(f"The provided response cache directory '{response_cache_dir}' is not readable.")
+            if not os.access(response_cache_dir, os.X_OK):
+                raise PermissionError(f"The provided response cache directory '{response_cache_dir}' is not executable.")
+            return self
+        
+        os.makedirs(response_cache_dir, exist_ok=True)
+        print(f"[INFO] Created response cache directory at {response_cache_dir}")
+        
+        self.__RESPONSE_CACHE_DIR = response_cache_dir
+        return self
 
 
     # Reset Methods
-    def reset_cache_threshold_period(self) -> None:
+    def reset_cache_threshold_period(self) -> 'ResponseCacher':
         """
         Resets the cache threshold period to the default value of 5 days
         """
-        self.CACHE_THRESHOLD_PERIOD = datetime.timedelta(days=5)
-        print(f"[INFO] Cache threshold period reset to {self.CACHE_THRESHOLD_PERIOD}")
+        self.__CACHE_THRESHOLD_PERIOD = DefaultConfigConstants.DEFAULT_CACHE_THRESHOLD_PERIOD_DAYS
+        print(f"[INFO] Cache threshold period reset to {self.__CACHE_THRESHOLD_PERIOD}")
+        return self
 
 
-    def reset_response_cache_dir(self) -> None:
+    def reset_response_cache_dir(self) -> 'ResponseCacher':
         """
         Resets the response cache directory to the default value
         """
-        self.RESPONSE_CACHE_DIR = os.path.join(PathConfigurations.PROJECT_ROOT, "response_cache")
-        print(f"[INFO] Response cache directory reset to {self.RESPONSE_CACHE_DIR}")
+        self.__RESPONSE_CACHE_DIR = DefaultConfigConstants.DEFAULT_RESPONSE_CACHE_DIR
+        print(f"[INFO] Response cache directory reset to {self.__RESPONSE_CACHE_DIR}")
+        return self
 
 
-    def reset_config(self) -> None:
+    def reset_config(self) -> 'ResponseCacher':
         """
         Resets all cache configurations to their default values
         """
-        self.reset_cache_threshold_period()
-        self.reset_response_cache_dir()
+        return self.reset_cache_threshold_period().reset_response_cache_dir()
 
 
     # Public Methods
@@ -83,7 +104,7 @@ class ResponseCacher(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        response_file_path = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        response_file_path = os.path.join(self.__RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         os.makedirs(os.path.dirname(response_file_path), exist_ok=True)
         with open(response_file_path, 'w') as f:
@@ -111,14 +132,14 @@ class ResponseCacher(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        response_file_path = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        response_file_path = os.path.join(self.__RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         if not os.path.exists(response_file_path):
             return False
         
         modified_time: float = os.path.getmtime(response_file_path)
         time_elapsed_since_last_modification = datetime.timedelta(seconds=(time.time() - modified_time))
-        return time_elapsed_since_last_modification <= self.CACHE_THRESHOLD_PERIOD
+        return time_elapsed_since_last_modification <= self.__CACHE_THRESHOLD_PERIOD
             
 
     def retrieve_from_cache(
@@ -144,7 +165,7 @@ class ResponseCacher(metaclass=SingletonMeta):
         dir_for_response_file: str = f"{which_instrument.lower().replace(' ', '_').replace('.', '_').replace(':', '_')}"
         response_file_name: str = f"{which_api.value.split('.')[1]}_response.json"
 
-        retrieval_file_path: str = os.path.join(self.RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
+        retrieval_file_path: str = os.path.join(self.__RESPONSE_CACHE_DIR, api_dir, dir_for_response_file, response_file_name)
 
         cached_instrument: dict = {}
         with open(retrieval_file_path, 'r') as f:

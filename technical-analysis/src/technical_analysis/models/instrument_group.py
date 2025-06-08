@@ -3,13 +3,14 @@ from typing import Literal
 
 import pandas as pd
 
+from technical_analysis.config.data_view_config import GlobalDataViewConfig
 from technical_analysis.enums.candlespan import CandlespanEnum
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.renko import Renko
 from technical_analysis.providers.data_view import DataViewProvider
-from technical_analysis.utils.decorators import mutually_exclusive_args
+from technical_analysis.utils.decorators import mutually_exclusive_args, optionally_overridable
 
 
 class InstrumentGroup:
@@ -25,48 +26,53 @@ class InstrumentGroup:
         self,
         instrument_symbols: list[str],
         candle_span: CandlespanEnum,
-        data_view_provider: DataViewProvider
+        data_view_provider: DataViewProvider | None = None
     ):
-        self.__candle_span: CandlespanEnum = candle_span
-        self.__views: DataViewProvider = data_view_provider
+        if data_view_provider is None:
+            data_view_provider = GlobalDataViewConfig().get()
+            if data_view_provider is None:
+                raise ValueError("No DataViewProvider configured globally or custom provided while instantiating InstrumentGroup or its subclasses.")
+
+        self._candle_span: CandlespanEnum = candle_span
+        self._views: DataViewProvider = data_view_provider
 
         print("[WARNING] Initializing InstrumentGroup instruments. Invalid instrument symbols (if any), will be dropped")
-        self.__instrument_symbols: list[str] = self.__filter_valid_instruments(instrument_symbols)
+        self._instrument_symbols: list[str] = self._filter_valid_instruments(instrument_symbols)
     
     
     # Getters
     @property
     def candle_span(self) -> CandlespanEnum:
-        return self.__candle_span
+        return self._candle_span
 
     @property
     def instrument_symbols(self) -> list[str]:
-        return self.__instrument_symbols
+        return self._instrument_symbols
 
 
     # Chainable Setters
     @candle_span.setter
     def candle_span(self, candle_span: CandlespanEnum) -> 'InstrumentGroup':
-        if self.__candle_span != candle_span:
-            self.__candle_span = candle_span
-            self.__invalidate_cached_properties()
+        if self._candle_span != candle_span:
+            self._candle_span = candle_span
+            self._invalidate_cached_properties()
         return self
 
     @instrument_symbols.setter
     def instrument_symbols(self, instrument_symbols: list[str]) -> 'InstrumentGroup':
-        if self.__instrument_symbols != instrument_symbols:
-            self.__instrument_symbols = self.__filter_valid_instruments(instrument_symbols)
-            self.__invalidate_cached_properties()
+        if self._instrument_symbols != instrument_symbols:
+            self._instrument_symbols = self._filter_valid_instruments(instrument_symbols)
+            self._invalidate_cached_properties()
         return self
 
 
-    # Comparative Dataframes
+    # Cached Dataframes
     @cached_property
     def closes_df(self) -> pd.DataFrame:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and close prices as the cell-data
         """
-        return self.__views.instrument_group_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_metric_view(OHLCVUDEnum.CLOSE, self._candle_span, self._instrument_symbols)
 
 
     @cached_property
@@ -74,7 +80,7 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume as the cell-data
         """
-        return self.__views.instrument_group_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_metric_view(OHLCVUDEnum.VOLUME, self._candle_span, self._instrument_symbols)
 
 
     @cached_property
@@ -82,7 +88,7 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and returns as the cell-data
         """
-        return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_change_in_metric_view(OHLCVUDEnum.CLOSE, self._candle_span, self._instrument_symbols)
 
 
     @cached_property
@@ -90,7 +96,7 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and volume change as the cell-data
         """
-        return self.__views.instrument_group_change_in_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_change_in_metric_view(OHLCVUDEnum.VOLUME, self._candle_span, self._instrument_symbols)
 
 
     @cached_property
@@ -98,7 +104,7 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative returns as the cell-data
         """
-        return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.CLOSE, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.CLOSE, self._candle_span, self._instrument_symbols)
 
 
     @cached_property
@@ -106,21 +112,21 @@ class InstrumentGroup:
         """
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative volume change as the cell-data
         """
-        return self.__views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.VOLUME, self.__candle_span, self.__instrument_symbols)
+        return self._views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.VOLUME, self._candle_span, self._instrument_symbols)
 
 
     # Public Methods
     def as_instruments(self) -> dict[str, Instrument]:
         return {
-            instrument_symbol: Instrument(instrument_symbol, self.__candle_span, self.__views)
-            for instrument_symbol in self.__instrument_symbols
+            instrument_symbol: Instrument(instrument_symbol, self._candle_span, self._views)
+            for instrument_symbol in self._instrument_symbols
         }
     
 
     def as_candlesticks(self) -> dict[str, Candlesticks]:
         return {
-            instrument_symbol: Candlesticks(instrument_symbol, self.__candle_span, self.__views)
-            for instrument_symbol in self.__instrument_symbols
+            instrument_symbol: Candlesticks(instrument_symbol, self._candle_span, self._views)
+            for instrument_symbol in self._instrument_symbols
         }
 
 
@@ -131,17 +137,17 @@ class InstrumentGroup:
         brick_size: int | None = None
     ) -> dict[str, Renko]:
         return {
-            instrument_symbol: Renko(instrument_symbol, self.__candle_span, self.__views, brick_size_from_atr, brick_size)
-            for instrument_symbol in self.__instrument_symbols
+            instrument_symbol: Renko(instrument_symbol, self._candle_span, self._views, brick_size_from_atr, brick_size)
+            for instrument_symbol in self._instrument_symbols
         }
     
 
     def get_instrument(self, instrument_symbol: str) -> Instrument | None:
-        return Instrument(instrument_symbol, self.__candle_span, self.__views) if self.is_instrument_available(instrument_symbol) else None
+        return Instrument(instrument_symbol, self._candle_span, self._views) if self.is_instrument_available(instrument_symbol) else None
 
 
     def get_instrument_candlesticks(self, instrument_symbol: str) -> Candlesticks | None:
-        return Candlesticks(instrument_symbol, self.__candle_span, self.__views) if self.is_instrument_available(instrument_symbol) else None
+        return Candlesticks(instrument_symbol, self._candle_span, self._views) if self.is_instrument_available(instrument_symbol) else None
 
 
     @mutually_exclusive_args("brick_size_from_atr", "brick_size")
@@ -153,30 +159,30 @@ class InstrumentGroup:
     ) -> Renko | None:
         return Renko(
             instrument_symbol,
-            self.__candle_span,
-            self.__views,
+            self._candle_span,
+            self._views,
             brick_size_from_atr,
             brick_size
         ) if self.is_instrument_available(instrument_symbol) else None
     
 
     def is_instrument_available(self, instrument_symbol: str) -> bool:
-        return instrument_symbol in self.__instrument_symbols
+        return instrument_symbol in self._instrument_symbols
     
 
     def add_instrument(self, instrument_symbol: str) -> 'InstrumentGroup':
-        if instrument_symbol not in self.__instrument_symbols:
-            if not self.__views.source_api.is_instrument_valid(self.__candle_span, instrument_symbol):
+        if instrument_symbol not in self._instrument_symbols:
+            if not self._views.source_api.is_instrument_valid(self._candle_span, instrument_symbol):
                 raise ValueError(f"Unable to add instrument {instrument_symbol}. {instrument_symbol} seems to be invalid")
         
-            self.__instrument_symbols.append(instrument_symbol)
+            self._instrument_symbols.append(instrument_symbol)
 
         return self
     
 
     def remove_instrument(self, instrument_symbol: str) -> 'InstrumentGroup':
-        if instrument_symbol in self.__instrument_symbols:
-            self.__instrument_symbols.remove(instrument_symbol)
+        if instrument_symbol in self._instrument_symbols:
+            self._instrument_symbols.remove(instrument_symbol)
 
         return self
 
@@ -188,8 +194,8 @@ class InstrumentGroup:
         window: int
     ) -> pd.DataFrame:
         
-        return self.__operate_on_df(
-            self.__resolve_df(on_which_data),
+        return self._operate_on_df(
+            self._resolve_df(on_which_data),
             operation=which_operation,
             operation_type='simple',
             window=window
@@ -204,20 +210,21 @@ class InstrumentGroup:
         min_periods: int = 0,
     ) -> pd.DataFrame:
         
-        return self.__operate_on_df(
-            self.__resolve_df(on_which_data),
+        return self._operate_on_df(
+            self._resolve_df(on_which_data),
             operation=which_operation,
             operation_type='exponential',
             window=window,
             min_periods=min_periods
         )
-    
-    
-    # Private Methods
-    def __filter_valid_instruments(self, instrument_symbols: list[str]) -> list[str]:
+
+
+    # Protected Methods
+    @optionally_overridable
+    def _filter_valid_instruments(self, instrument_symbols: list[str]) -> list[str]:
         valid_instrument_symbols: list[str] = []
         for instrument_symbol in instrument_symbols:
-            if not self.__views.source_api.is_instrument_valid(self.__candle_span, instrument_symbol):
+            if not self._views.source_api.is_instrument_valid(self._candle_span, instrument_symbol):
                 print(f"[WARNING] Instrument {instrument_symbol} is invalid and hence dropped")
                 continue
 
@@ -230,7 +237,8 @@ class InstrumentGroup:
         return valid_instrument_symbols
     
 
-    def __resolve_df(
+    @optionally_overridable
+    def _resolve_df(
         self,
         df_name: _AvailableDataFramesType
     ) -> pd.DataFrame:
@@ -256,7 +264,8 @@ class InstrumentGroup:
             raise ValueError(unsupported_df_err_msg)
         
     
-    def __operate_on_df(
+    @optionally_overridable
+    def _operate_on_df(
         self,
         df: pd.DataFrame,
         operation: Literal['mean', 'var', 'std', 'min', 'max', 'corr', 'cov'],
@@ -311,7 +320,8 @@ class InstrumentGroup:
             raise ValueError(unsupported_operation_type_err_msg)
         
 
-    def __invalidate_cached_properties(self) -> None:
+    @optionally_overridable
+    def _invalidate_cached_properties(self) -> None:
         """
         Invalidates all cached properties.
 

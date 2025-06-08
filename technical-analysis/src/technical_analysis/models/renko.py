@@ -1,6 +1,8 @@
 from functools import cached_property
+
 import pandas as pd
 
+from technical_analysis.config.data_view_config import GlobalDataViewConfig
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.indicators.indicator_calculator import IndicatorCalculator
 from technical_analysis.enums.candlespan import CandlespanEnum
@@ -32,7 +34,7 @@ class Renko(Instrument):
         self,
         instrument_symbol: str,
         source_candle_span: CandlespanEnum,
-        data_view_provider: DataViewProvider,
+        data_view_provider: DataViewProvider | None = None,
         brick_size_from_atr: tuple[CandlespanEnum, _NumberOfPeriodsType] | None = None,
         brick_size: int | None = None
     ):
