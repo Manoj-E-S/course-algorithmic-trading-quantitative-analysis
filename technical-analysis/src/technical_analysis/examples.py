@@ -1,5 +1,11 @@
+from datetime import datetime
+from pprint import pprint
+import pandas as pd
 from technical_analysis.config.data_view_config import GlobalDataViewConfig
+from technical_analysis.enums.ohlcvud import OHLCVUDEnum
 from technical_analysis.models.candlesticks import Candlesticks
+from technical_analysis.models.instrument import Instrument
+from technical_analysis.models.instrument_universe import InstrumentUniverse
 from technical_analysis.models.portfolio import Portfolio
 from technical_analysis.providers.data_cleaning import DataCleaningProvider
 from technical_analysis.providers.data_view import DataViewProvider
@@ -25,10 +31,67 @@ class DefaultConstants:
     BRICK_SIZE_FROM_ATR: tuple[CandlespanEnum, int] = (CandlespanEnum.DAILY, 300)
     CACHE_OUTDATION_PERIOD_DAYS: int = 5
     CANDLE_SPAN: CandlespanEnum = CandlespanEnum.DAILY
-    INSTRUMENT_SYMBOLS: list[str] = ['RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE']
-    INSTRUMENT_SYMBOLS_WITH_INVALID: list[str] = ['RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE', 'XYZ', 'ahbgd']
+    SAMPLE_INSTRUMENT: str = 'RELIANCE.BSE'
     NA_STRATEGY: str = 'backfill'
-    INSTRUMENT: str = 'RELIANCE.BSE'
+    
+    INSTRUMENT_SYMBOLS: list[str] = [
+        'RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE'
+    ]
+    INSTRUMENT_SYMBOLS_WITH_INVALID: list[str] = [
+        'RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE', 'XYZ', 'ahbgd'
+    ]
+    NIFTY_50_UNIVERSE: list[str] = [
+        'RELIANCE.BSE',
+        'HDFCBANK.BSE',
+        'TCS.BSE',
+        'BHARTIARTL.BSE',
+        'ICICIBANK.BSE',
+        'SBIN.BSE',
+        'INFY.BSE',
+        'BAJFINANCE.BSE',
+        'HINDUNILVR.BSE',
+        'ITC.BSE',
+        'LT.BSE',
+        'HCLTECH.BSE',
+        'KOTAKBANK.BSE',
+        'SUNPHARMA.BSE',
+        'MARUTI.BSE',
+        'M&M.BSE',
+        'AXISBANK.BSE',
+        'ULTRACEMCO.BSE',
+        'NTPC.BSE', # 532555.BSE
+        'BAJAJFINSV.BSE',
+        'ADANIPORTS.BSE',
+        'TITAN.BSE',
+        'ONGC.BSE',
+        'ADANIENT.BSE',
+        # Bharat Electronics: BHARATELE.BSE,
+        'POWERGRID.BSE',
+        'TATAMOTORS.BSE',
+        'WIPRO.BSE', # 507685.BSE
+        # Eternal (Zomato): ZOMATO.BSE,
+        'COALINDIA.BSE', # 533278.BSE
+        'JSWSTEEL.BSE', # 500228.BSE
+        'BAJAJ-AUTO.BSE', # 532977.BSE
+        'NESTLEIND.BSE', # 500790.BSE
+        'ASIANPAINT.BSE',
+        'TRENT.BSE',
+        'TATASTEEL.BSE',
+        # Jio Financial Serv.: JIOFINANCIAL.BSE,
+        'SBILIFE.BSE',
+        'GRASIM.BSE', # 500300.BSE
+        'HDFCLIFE.BSE',
+        'TECHM.BSE',
+        'EICHERMOT.BSE', # 505200.BSE
+        'HINDALCO.BSE',
+        'SHRIRAMFIN.BSE',
+        'CIPLA.BSE', # 500087.BSE
+        'TATACONSUM.BSE', # 500800.BSE
+        # Dr Reddy's Labs: DR_REDDYS_LABS.BSE,
+        'APOLLOHOSP.BSE',
+        'HEROMOTOCO.BSE',
+        'INDUSINDBK.BSE', 
+    ]
 
 
 def default_data_cleaning_provider() -> DataCleaningProvider:
@@ -61,7 +124,7 @@ def default_instrument_group() -> InstrumentGroup:
 
 def default_renko(
     from_atr: bool,
-    instrument_symbol: str = DefaultConstants.INSTRUMENT,
+    instrument_symbol: str = DefaultConstants.SAMPLE_INSTRUMENT,
     candle_span: CandlespanEnum = DefaultConstants.CANDLE_SPAN,
     brick_size_from_atr: tuple[CandlespanEnum, int] = DefaultConstants.BRICK_SIZE_FROM_ATR,
     brick_size: int = DefaultConstants.BRICK_SIZE
@@ -85,7 +148,7 @@ def default_renko(
     
 
 def default_candlesticks(
-    instrument_symbol: str = DefaultConstants.INSTRUMENT,
+    instrument_symbol: str = DefaultConstants.SAMPLE_INSTRUMENT,
     candle_span: CandlespanEnum = DefaultConstants.CANDLE_SPAN,
 ) -> Candlesticks:
     """
@@ -441,7 +504,7 @@ def example_usage_renko_instrument_plotter(
 
 def example_usage_renko_dataframe(
     from_atr: bool,
-    instrument_symbol: str = DefaultConstants.INSTRUMENT,
+    instrument_symbol: str = DefaultConstants.SAMPLE_INSTRUMENT,
     candle_span: CandlespanEnum = DefaultConstants.CANDLE_SPAN,
     brick_size_from_atr: tuple[CandlespanEnum, int] = DefaultConstants.BRICK_SIZE_FROM_ATR,
     brick_size: int = DefaultConstants.BRICK_SIZE,
@@ -473,7 +536,7 @@ if __name__ == "__main__":
     """
     Some default constants for example usage.
     """
-    instrument: str = DefaultConstants.INSTRUMENT
+    instrument: str = DefaultConstants.SAMPLE_INSTRUMENT
     ig: InstrumentGroup = default_instrument_group()
     brick_size_from_atr: tuple[CandlespanEnum, int] = DefaultConstants.BRICK_SIZE_FROM_ATR
     brick_size: int = DefaultConstants.BRICK_SIZE
@@ -530,4 +593,44 @@ if __name__ == "__main__":
     """
     Portfolio and Instrument Universe
     """
-    portfolio = Portfolio()
+    nifty_50_index: Instrument = Instrument(
+        instrument_symbol='NIFTYBEES.BSE',
+        candle_span=CandlespanEnum.MONTHLY
+    )
+
+    sensex_30_index: Instrument = Instrument(
+        instrument_symbol='SENSEXBEES.BSE',
+        candle_span=CandlespanEnum.MONTHLY
+    )
+
+    nifty_50_universe = InstrumentUniverse(
+        instrument_symbols=DefaultConstants.NIFTY_50_UNIVERSE,
+        candle_span=CandlespanEnum.MONTHLY
+    )
+
+    portfolio = Portfolio(
+        number_of_holdings=10,
+        source_universe=nifty_50_universe,
+        # optimization_strategy='rebalancing',
+        start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        # start_date='earliest',
+        # end_date='latest'
+    )
+
+    # print(portfolio._Portfolio__holdings_v_kpis_as_of_date(pd.Timestamp('2023-09-29')))
+
+    print("Portfolio Start Date:")
+    pprint(portfolio.start_date)
+    print("Portfolio End Date:")
+    pprint(portfolio.end_date)
+    print("Portfolio Optimization Strategy:")
+    pprint(portfolio.optimization_strategy)
+    print("Portfolio Number of Holdings:")
+    pprint(portfolio.number_of_holdings)
+    print("Portfolio Current Holdings:")
+    pprint(portfolio.current_holdings)
+    print("Portfolio Current Holdings with KPIs:")
+    pprint(portfolio.current_holdings_v_kpis)
+    print("Portfolio Holding History:")
+    pprint(portfolio.holding_history)

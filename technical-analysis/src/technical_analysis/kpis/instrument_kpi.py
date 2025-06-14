@@ -1,9 +1,7 @@
 from functools import cached_property
 import pandas as pd
 
-from technical_analysis.enums.candlespan import CandlespanEnum
-from technical_analysis.enums.ohlcvud import OHLCVUDEnum
-from technical_analysis.kpis.kpi_calculator import KpiCalculator
+from technical_analysis.kpis.dataframe_kpi_calculator import DataFrameExtendedKPICalculator
 from technical_analysis.models.instrument import Instrument
 
 
@@ -39,158 +37,191 @@ class InstrumentKPI:
 
     # Cached callable properties
     @cached_property
-    def computed_or_cached_CAGR(self) -> float:
-        ohlcv_df: pd.DataFrame = self.__instrument.ohlcv_df
-        if ohlcv_df.empty:
-            return 0.0
-
-        start_date_idx: int = 0
-        end_date_idx: int = -1
-        periods: float = self.__get_years_between_date_indices(ohlcv_df, start_date_idx, end_date_idx)
-
-        return KpiCalculator.cagr(
-            start_price = ohlcv_df[OHLCVUDEnum.CLOSE.value].iloc[start_date_idx],
-            end_price = ohlcv_df[OHLCVUDEnum.CLOSE.value].iloc[end_date_idx],
-            periods = periods
+    def cached_CAGR(self) -> float:
+        return DataFrameExtendedKPICalculator.compute_cagr(
+            self.__instrument.ohlcv_df,
+            self.instrument.candle_span,
+            from_date=None,
+            until_date=None
         )
-    
-
-    @cached_property
-    def computed_or_cached_MAX_DRAWDOWN(self) -> float:
-        cumulative_returns: pd.Series = self.__instrument.cumulative_returns_series
-        if cumulative_returns.empty:
-            return 0.0
-        
-        return KpiCalculator.max_drawdown(cumulative_returns)
 
 
     @cached_property
-    def computed_or_cached_CALMAR_RATIO(self) -> float:
-        annual_returns: float = self.cagr()
-        max_drawdown: float = self.max_drawdown()
+    def cached_MAX_DRAWDOWN(self) -> float:
+        return DataFrameExtendedKPICalculator.compute_max_drawdown(
+            self.__instrument.cumulative_returns_series,
+            from_date=None,
+            until_date=None
+        )
 
-        return KpiCalculator.calmar_ratio(annual_returns, max_drawdown)
-    
+
+    @cached_property
+    def cached_CALMAR_RATIO(self) -> float:
+        return DataFrameExtendedKPICalculator.compute_calamar_ratio(
+            cagr=self.cached_CAGR,
+            max_drawdown=self.cached_MAX_DRAWDOWN,
+        )
+
 
     # Public methods
-    def cagr(self) -> float:
+    def cagr(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the Compound Annual Growth Rate (CAGR) of the instrument.
-        
+
+        :param from_date: The date from which to calculate the CAGR. If None, uses the earliest date
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the CAGR.
+        :type until_date: pd.Timestamp | None
+
         :return: The CAGR as a float.
         """
-        return self.computed_or_cached_CAGR
+        if until_date is None and from_date is None:
+            return self.cached_CAGR
+
+        return DataFrameExtendedKPICalculator.compute_cagr(
+            self.__instrument.ohlcv_df,
+            self.instrument.candle_span,
+            from_date=from_date,
+            until_date=until_date
+        )
 
 
-    def max_drawdown(self) -> float:
+    def max_drawdown(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the maximum drawdown of the instrument.
+
+        :param from_date: The date from which to calculate the maximum drawdown. If None, uses the earliest date.
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the maximum drawdown. If None, uses the latest date.
+        :type until_date: pd.Timestamp | None
         
         :return: The maximum drawdown as a float.
         """
-        return self.computed_or_cached_MAX_DRAWDOWN
+        if until_date is None and from_date is None:
+            return self.cached_MAX_DRAWDOWN
+
+        return DataFrameExtendedKPICalculator.compute_max_drawdown(
+            self.__instrument.cumulative_returns_series,
+            from_date=from_date,
+            until_date=until_date
+        )
 
 
-    def calmar_ratio(self) -> float:
+    def calmar_ratio(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the Calmar Ratio of the instrument.
+
+        :param from_date: The date from which to calculate the Calmar Ratio. If None, uses the earliest date.
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the Calmar Ratio. If None, uses the latest date.
+        :type until_date: pd.Timestamp | None
         
         :return: The Calmar Ratio as a float.
         """
-        return self.computed_or_cached_CALMAR_RATIO
+        if until_date is None and from_date is None:
+            return self.cached_CALMAR_RATIO
+        
+        return DataFrameExtendedKPICalculator.compute_calamar_ratio(
+            cagr=self.cagr(
+                from_date=from_date,
+                until_date=until_date
+            ),
+            max_drawdown=self.max_drawdown(
+                from_date=from_date,
+                until_date=until_date
+            )
+        )
 
 
-    def annualized_volatility(self, downside: bool = False) -> float:
+    def annualized_volatility(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None, downside: bool = False) -> float:
         """
         Calculate the annualized volatility of the instrument.
-        
+
+        :param from_date: The date from which to calculate the annualized volatility. If None, uses the earliest date.
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the annualized volatility. If None, uses the latest date.
+        :type until_date: pd.Timestamp | None
+
         :param downside: If True, calculate downside volatility; otherwise, calculate total volatility.
         :type downside: bool
         
         :return: The annualized volatility as a float.
         :rtype: float
         """
-        returns_series: pd.Series = self.__instrument.returns_series
-
-        if returns_series.empty:
-            return 0.0
-        
-        volatility = KpiCalculator.non_annualized_volatility(returns_series, downside=downside)
-        
-        if self.instrument.candle_span == CandlespanEnum.DAILY:
-            return volatility * (252 ** 0.5)
-        elif self.instrument.candle_span == CandlespanEnum.WEEKLY:
-            return volatility * (52 ** 0.5)
-        elif self.instrument.candle_span == CandlespanEnum.MONTHLY:
-            return volatility * (12 ** 0.5)
-        else:
-            err: str = f"Unsupported candle span. Suppported candle spans are: {CandlespanEnum.values()}"
-            raise ValueError(err)
+        return DataFrameExtendedKPICalculator.compute_annualized_volatility(
+            returns_series=self.__instrument.returns_series,
+            candle_span=self.__instrument.candle_span,
+            from_date=from_date,
+            until_date=until_date,
+            downside=downside
+        )
     
 
-    def sharpe_ratio(self, risk_free_rate: float) -> float:
+    def sharpe_ratio(self, risk_free_rate: float, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the Sharpe Ratio of the instrument.
 
         :param risk_free_rate: The risk-free rate to be used in the calculation.
         :type risk_free_rate: float
+
+        :param from_date: The date from which to calculate the Sharpe Ratio. If None, uses the earliest date.
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the Sharpe Ratio. If None, uses the latest date.
+        :type until_date: pd.Timestamp | None
         
         :return: The Sharpe Ratio as a float.
         :rtype: float
         """
-        expected_returns: float = self.cagr()
-        volatility: float = self.annualized_volatility()
-
-        return KpiCalculator.sharpe_ratio(expected_returns, risk_free_rate, volatility)
+        return DataFrameExtendedKPICalculator.compute_sharpe_ratio(
+            risk_free_rate = risk_free_rate,
+            expected_returns = self.cagr(
+                from_date=from_date,
+                until_date=until_date
+            ),
+            volatility = self.annualized_volatility(
+                from_date=from_date,
+                until_date=until_date,
+                downside=False
+            )
+        )
     
 
-    def sortino_ratio(self, risk_free_rate: float) -> float:
+    def sortino_ratio(self, risk_free_rate: float, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the Sortino Ratio of the instrument.
         
         :param risk_free_rate: The risk-free rate to be used in the calculation.
         :type risk_free_rate: float
+
+        :param from_date: The date from which to calculate the Sortino Ratio. If None, uses the earliest date.
+        :type from_date: pd.Timestamp | None
+
+        :param until_date: The date until which to calculate the Sortino Ratio. If None, uses the latest date.
+        :type until_date: pd.Timestamp | None
         
         :return: The Sortino Ratio as a float.
         :rtype: float
         """
-        expected_returns: float = self.cagr()
-        downside_volatility: float = self.annualized_volatility(downside=True)
-
-        return KpiCalculator.sortino_ratio(expected_returns, risk_free_rate, downside_volatility)
+        return DataFrameExtendedKPICalculator.compute_sortino_ratio(
+            risk_free_rate=risk_free_rate,
+            expected_returns=self.cagr(
+                from_date=from_date,
+                until_date=until_date
+            ),
+            downside_volatility=self.annualized_volatility(
+                from_date=from_date,
+                until_date=until_date,
+                downside=True
+            )
+        )
 
 
     # Private methods
-    def __get_years_between_date_indices(self, ohlcv_df: pd.DataFrame, start_date_idx: int = 0, end_date_idx: int = -1) -> float:
-        """
-        Get the number of years between two date indices in the OHLCV DataFrame.
-
-        :param ohlcv_df: The OHLCV DataFrame containing the instrument data.
-        :type ohlcv_df: pd.DataFrame
-        
-        :param start_date_idx: The index of the start date in the DataFrame. Default is 0.
-        :type start_date_idx: int
-        
-        :param end_date_idx: The index of the end date in the DataFrame. Default is -1 (last index).
-        :type end_date_idx: int
-        
-        :return: The number of years between the two dates as a float.
-        :rtype: float
-        """
-        start_date: pd.Timestamp = ohlcv_df.index[start_date_idx]
-        end_date: pd.Timestamp = ohlcv_df.index[end_date_idx]
-
-        if self.instrument.candle_span == CandlespanEnum.DAILY:
-            return (end_date - start_date).days / 252
-        elif self.instrument.candle_span == CandlespanEnum.WEEKLY:
-            return (end_date - start_date).days / 52
-        elif self.instrument.candle_span == CandlespanEnum.MONTHLY:
-            return (end_date - start_date).days / 12
-        else:
-            err: str = f"Unsupported candle span. Suppported candle spans are: {CandlespanEnum.values()}"
-            raise ValueError(err)
-        
-    
     def __after_property_update(self) -> None:
         """
         This method is called after any property update to invalidate cached properties, and perform any other actions needed.

@@ -46,15 +46,12 @@ class KpiCalculator:
         :return: The volatility as a fraction.
         :rtype: float
         """
-        if returns_series.empty:
+        if downside:
+            returns_series = returns_series[returns_series < 0]
+
+        if returns_series.empty or returns_series.size == 1:
             return 0.0
         
-        if downside:
-            negative_returns = returns_series[returns_series < 0]
-            if negative_returns.empty:
-                return 0.0
-            return negative_returns.std()
-
         return returns_series.std()
 
 
