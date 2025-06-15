@@ -1,7 +1,7 @@
 from functools import cached_property
 import pandas as pd
 
-from technical_analysis.kpis.dataframe_kpi_calculator import DataFrameExtendedKPICalculator
+from technical_analysis.kpis.calculators.dataframe_enhanced_kpi_calculator import DataFrameEnhancedKPICalculator
 from technical_analysis.models.instrument import Instrument
 
 
@@ -38,9 +38,8 @@ class InstrumentKPI:
     # Cached callable properties
     @cached_property
     def cached_CAGR(self) -> float:
-        return DataFrameExtendedKPICalculator.compute_cagr(
+        return DataFrameEnhancedKPICalculator.cagr_from_df(
             self.__instrument.ohlcv_df,
-            self.instrument.candle_span,
             from_date=None,
             until_date=None
         )
@@ -48,7 +47,7 @@ class InstrumentKPI:
 
     @cached_property
     def cached_MAX_DRAWDOWN(self) -> float:
-        return DataFrameExtendedKPICalculator.compute_max_drawdown(
+        return DataFrameEnhancedKPICalculator.max_drawdown_from_df(
             self.__instrument.cumulative_returns_series,
             from_date=None,
             until_date=None
@@ -56,9 +55,9 @@ class InstrumentKPI:
 
 
     @cached_property
-    def cached_CALMAR_RATIO(self) -> float:
-        return DataFrameExtendedKPICalculator.compute_calamar_ratio(
-            cagr=self.cached_CAGR,
+    def cached_CALAMAR_RATIO(self) -> float:
+        return DataFrameEnhancedKPICalculator.calamar_ratio(
+            annual_return=self.cached_CAGR,
             max_drawdown=self.cached_MAX_DRAWDOWN,
         )
 
@@ -79,9 +78,8 @@ class InstrumentKPI:
         if until_date is None and from_date is None:
             return self.cached_CAGR
 
-        return DataFrameExtendedKPICalculator.compute_cagr(
+        return DataFrameEnhancedKPICalculator.cagr_from_df(
             self.__instrument.ohlcv_df,
-            self.instrument.candle_span,
             from_date=from_date,
             until_date=until_date
         )
@@ -102,14 +100,14 @@ class InstrumentKPI:
         if until_date is None and from_date is None:
             return self.cached_MAX_DRAWDOWN
 
-        return DataFrameExtendedKPICalculator.compute_max_drawdown(
+        return DataFrameEnhancedKPICalculator.max_drawdown_from_df(
             self.__instrument.cumulative_returns_series,
             from_date=from_date,
             until_date=until_date
         )
 
 
-    def calmar_ratio(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
+    def calamar_ratio(self, from_date: pd.Timestamp | None = None, until_date: pd.Timestamp | None = None) -> float:
         """
         Calculate the Calmar Ratio of the instrument.
 
@@ -122,10 +120,10 @@ class InstrumentKPI:
         :return: The Calmar Ratio as a float.
         """
         if until_date is None and from_date is None:
-            return self.cached_CALMAR_RATIO
-        
-        return DataFrameExtendedKPICalculator.compute_calamar_ratio(
-            cagr=self.cagr(
+            return self.cached_CALAMAR_RATIO
+
+        return DataFrameEnhancedKPICalculator.calamar_ratio(
+            annual_return=self.cagr(
                 from_date=from_date,
                 until_date=until_date
             ),
@@ -152,9 +150,9 @@ class InstrumentKPI:
         :return: The annualized volatility as a float.
         :rtype: float
         """
-        return DataFrameExtendedKPICalculator.compute_annualized_volatility(
+        return DataFrameEnhancedKPICalculator.annualized_volatility_from_df(
             returns_series=self.__instrument.returns_series,
-            candle_span=self.__instrument.candle_span,
+            row_span=self.__instrument.candle_span,
             from_date=from_date,
             until_date=until_date,
             downside=downside
@@ -177,7 +175,7 @@ class InstrumentKPI:
         :return: The Sharpe Ratio as a float.
         :rtype: float
         """
-        return DataFrameExtendedKPICalculator.compute_sharpe_ratio(
+        return DataFrameEnhancedKPICalculator.sharpe_ratio(
             risk_free_rate = risk_free_rate,
             expected_returns = self.cagr(
                 from_date=from_date,
@@ -207,7 +205,7 @@ class InstrumentKPI:
         :return: The Sortino Ratio as a float.
         :rtype: float
         """
-        return DataFrameExtendedKPICalculator.compute_sortino_ratio(
+        return DataFrameEnhancedKPICalculator.sortino_ratio(
             risk_free_rate=risk_free_rate,
             expected_returns=self.cagr(
                 from_date=from_date,

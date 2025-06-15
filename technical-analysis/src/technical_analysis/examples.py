@@ -33,6 +33,7 @@ class DefaultConstants:
     CANDLE_SPAN: CandlespanEnum = CandlespanEnum.DAILY
     SAMPLE_INSTRUMENT: str = 'RELIANCE.BSE'
     NA_STRATEGY: str = 'backfill'
+    RISK_FREE_RATE: float = 0.06  # 6% annual risk-free rate
     
     INSTRUMENT_SYMBOLS: list[str] = [
         'RELIANCE.BSE', 'HDFCBANK.BSE', 'ICICIBANK.BSE', 'SBIN.BSE', 'TATAMOTORS.BSE', 'ITC.BSE'
@@ -173,6 +174,16 @@ def configure_data_view_provider_globally():
     Setup the global data view config with the default DataViewProvider.
     """
     GlobalDataViewConfig(default_data_view_provider())
+
+
+def configure_risk_free_rate_globally(risk_free_rate: float | None = None):
+    """
+    Configure the global risk-free rate.
+    This is used in financial calculations like Sharpe Ratio and Sortino Ratio.
+    """
+    from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
+    GlobalRiskFreeRateConfig.set(risk_free_rate or DefaultConstants.RISK_FREE_RATE)
+    print(f"Global Risk-Free Rate set to {GlobalRiskFreeRateConfig.get()}")
 
 
 def example_usage_instrument_group(
@@ -532,6 +543,7 @@ if __name__ == "__main__":
     """
     setup_response_caching()
     configure_data_view_provider_globally()
+    configure_risk_free_rate_globally()
 
     """
     Some default constants for example usage.
@@ -608,29 +620,42 @@ if __name__ == "__main__":
         candle_span=CandlespanEnum.MONTHLY
     )
 
+    start_time = datetime.now()
+    print(f"Start Time: {start_time}")
     portfolio = Portfolio(
         number_of_holdings=10,
         source_universe=nifty_50_universe,
         # optimization_strategy='rebalancing',
-        start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        # start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        # end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
         # start_date='earliest',
         # end_date='latest'
     )
+    end_time = datetime.now()
+    print(f"End Time: {end_time}")
+    print(f"Time taken to create portfolio: {end_time - start_time}")
 
     # print(portfolio._Portfolio__holdings_v_kpis_as_of_date(pd.Timestamp('2023-09-29')))
 
+    print()
     print("Portfolio Start Date:")
     pprint(portfolio.start_date)
+    print()
     print("Portfolio End Date:")
     pprint(portfolio.end_date)
+    print()
     print("Portfolio Optimization Strategy:")
     pprint(portfolio.optimization_strategy)
+    print()
     print("Portfolio Number of Holdings:")
     pprint(portfolio.number_of_holdings)
+    print()
     print("Portfolio Current Holdings:")
     pprint(portfolio.current_holdings)
+    print()
     print("Portfolio Current Holdings with KPIs:")
     pprint(portfolio.current_holdings_v_kpis)
+    print()
     print("Portfolio Holding History:")
     pprint(portfolio.holding_history)
+    print()

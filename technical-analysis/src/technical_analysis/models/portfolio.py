@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Iterator, Literal
 import numpy as np
 import pandas as pd
-from technical_analysis.enums.kpi import KpiEnum
+from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
+from technical_analysis.enums.kpi import KPIEnum
 from technical_analysis.enums.portfolio_optimization_strategy import PortfolioOptimizationStrategy
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.instrument_universe import InstrumentUniverse
@@ -20,11 +21,16 @@ class Portfolio:
         source_universe: InstrumentUniverse,
         optimization_strategy: PortfolioOptimizationStrategy = PortfolioOptimizationStrategy.REBALANCING,
         start_date: datetime | Literal['earliest'] = 'earliest',
-        end_date: datetime | Literal['latest'] = 'latest'
+        end_date: datetime | Literal['latest'] = 'latest',
+        risk_free_rate: float | None = None
     ):
+        if risk_free_rate is None:
+            risk_free_rate = GlobalRiskFreeRateConfig.get()
+        
         self.__universe: InstrumentUniverse = source_universe
         self.__number_of_holdings: int = number_of_holdings
         self.__optimization_strategy: PortfolioOptimizationStrategy = optimization_strategy
+        self.__risk_free_rate: float = risk_free_rate
 
         available_dates: pd.DatetimeIndex = self.__available_dates(
             start_date=None if start_date == 'earliest' else pd.Timestamp(start_date),
@@ -34,9 +40,8 @@ class Portfolio:
         self.__start_date: pd.Timestamp = available_dates[0]
         self.__end_date: pd.Timestamp = available_dates[-1]
 
-        self.__holdings_v_kpis: pd.DataFrame = self.__current_holdings_v_kpis()
-        
-        self.__history: pd.DataFrame = self.__get_history()
+        self.__holdings_v_kpis: pd.DataFrame = self.__compute_holdings_v_kpis()
+        self.__history: pd.DataFrame = self.__compute_history()
 
 
     # Getters
@@ -70,11 +75,11 @@ class Portfolio:
     
     @property
     def holding_history(self) -> pd.DataFrame:
-        """
-        Returns the portfolio history as a DataFrame.
-        The index is the date, and the columns are the instrument symbols with their respective KPI values.
-        """
         return self.__history
+    
+    @property
+    def risk_free_rate(self) -> float:
+        return self.__risk_free_rate
 
 
     # Chainable Setters
@@ -93,6 +98,7 @@ class Portfolio:
             self.__after_property_update()
         return self
     
+
     @start_date.setter
     def start_date(self, start_date: datetime | Literal['earliest']) -> 'Portfolio':
         if self.__start_date != start_date:
@@ -104,6 +110,7 @@ class Portfolio:
             self.__after_property_update()
         return self
     
+
     @end_date.setter
     def end_date(self, end_date: datetime | Literal['latest']) -> 'Portfolio':
         if self.__end_date != end_date:
@@ -116,95 +123,56 @@ class Portfolio:
         return self
     
 
+    @risk_free_rate.setter
+    def risk_free_rate(self, risk_free_rate: float) -> 'Portfolio':
+        if self.__risk_free_rate != risk_free_rate:
+            self.__risk_free_rate = risk_free_rate
+            self.__after_property_update()
+        return self
+    
+
     # Private methods
-    def __current_holdings_v_kpis(self) -> pd.DataFrame:
+    def __compute_holdings_v_kpis(self) -> pd.DataFrame:
         """
-        Computes the holdings based on the optimization strategy and number of holdings.
-
-        :returns pd.DataFrame: A pandas DataFrame mapping instrument symbols to their respective KPI values.
-
-        :raises ValueError: If the optimization strategy is not supported.
+        Returns the current holdings with their KPIs as a DataFrame.
+        The index is the instrument symbol, and the columns are the KPI values.
         """
-        return self.__holdings_v_kpis_as_of_date(self.__end_date)
-
-
-    def __holdings_v_kpis_as_of_date(self, date: pd.Timestamp) -> pd.DataFrame:
-        """
-        Computes the holdings based on the optimization strategy and number of holdings.
-
-        :param date: The date as of which to compute the holdings.
-        :type date: pd.Timestamp
-        
-        :returns pd.DataFrame: A pandas DataFrame mapping instrument symbols to their respective KPI values as of the specified date.
-
-        :raises ValueError: If the optimization strategy is not supported.
-        """
-        print("Holdings as of date:", date)
         if self.__optimization_strategy == PortfolioOptimizationStrategy.REBALANCING:
-            data: dict[KpiEnum.ForInstrumentKPI, np.ndarray] = {}
-            cagrs_series: pd.Series = pd.Series(dtype='float64', name=KpiEnum.ForInstrumentKPI.CAGR.value)
-            
-            for kpi_value in KpiEnum.ForInstrumentKPI.values():
-                # kpi series of Top N most-profitable instruments, profitable by CAGR
-                kpi_enum = KpiEnum.ForInstrumentKPI(kpi_value)
-                kpi_series = self.__universe.n_sorted_instruments_by_kpi(
-                    sort_kpi=KpiEnum.ForInstrumentKPI.CAGR,
-                    n=self.__number_of_holdings,
-                    ascending=False,
-                    metric_kpi=kpi_enum,
-                    kwargs_for_sort_kpi={
-                        'from_date': self.__start_date,
-                        'until_date': date
-                    },
-                    kwargs_for_metric_kpi={
-                        'from_date': self.__start_date,
-                        'until_date': date,
-                        'risk_free_rate': 0.06 if kpi_enum in [KpiEnum.ForInstrumentKPI.SHARPE_RATIO, KpiEnum.ForInstrumentKPI.SORTINO_RATIO] else None,
-                        'downside': False if kpi_enum == KpiEnum.ForInstrumentKPI.ANNUALIZED_VOLATILITY else None
-                    }
-                )
-                data[kpi_value] = kpi_series.values
-                if kpi_enum == KpiEnum.ForInstrumentKPI.CAGR:
-                    cagrs_series = kpi_series
-                
-            return pd.DataFrame(index=cagrs_series.index, data=data, columns=KpiEnum.ForInstrumentKPI.values())
+            return self.__universe.instruments_sorted_by_kpi_for_date_snapshot(
+                by_which_kpi=KPIEnum.CAGR,
+                overall_start_date=self.__start_date,
+                snapshot_date=self.__end_date,
+                risk_free_rate_for_sharpe_and_sortino=self.__risk_free_rate,
+                ascending=False,
+                top_n=self.__number_of_holdings
+            )
         else:
-            raise ValueError(f"Invalid Portfolio Optimization strategy. Supported strategies are: {PortfolioOptimizationStrategy.values()}")
-
-
-    def __get_history(self) -> pd.DataFrame:
+            raise NotImplementedError(f"Optimization strategy {self.__optimization_strategy} is not implemented.")
+        
+    
+    def __compute_history(self) -> pd.DataFrame:
         """
-        Populates the portfolio history DataFrame with the holdings and KPIs from the start date to the end date.
-
-        :returns pd.DataFrame: A pandas DataFrame containing the portfolio history from the start date to the end date.
-        :rtype: pd.DataFrame
+        Returns the portfolio history as a DataFrame.
+        The indices are (date, instrument_symbol) and the columns are the KPIs.
         """
-        history_multiindex: pd.MultiIndex = pd.MultiIndex.from_product(
-            [
-                self.__available_dates(
-                    start_date=self.__start_date,
-                    end_date=self.__end_date
-                ),
-                KpiEnum.ForInstrumentKPI.values()
-            ],
-            names=['date', 'kpi']
-        )
-        
-        history = pd.DataFrame(data=np.nan, index=history_multiindex, columns=self.__holdings_v_kpis.index)
-        
-        all_dates_iter: Iterator[pd.Timestamp] = iter(history_multiindex.get_level_values('date').unique())
-        for date in all_dates_iter:
-            kpis_df: pd.DataFrame = self.__holdings_v_kpis_as_of_date(date)
-            for kpi in kpis_df.columns:
-                history.loc[(date, kpi), :] = kpis_df[kpi].values
-        
-        history.sort_index(inplace=True)
-        history.dropna(inplace=True)
+        if self.__optimization_strategy == PortfolioOptimizationStrategy.REBALANCING:
+            return self.__universe.instrument_history_sorted_by_kpi_per_date_for_date_range(
+                by_which_kpi=KPIEnum.CAGR,
+                period_start_date=self.__start_date,
+                period_end_date=self.__end_date,
+                ascending=False,
+                risk_free_rate_for_sharpe_and_sortino=self.__risk_free_rate,
+                top_n=self.__number_of_holdings
+            )
+        else:
+            raise NotImplementedError(f"Optimization strategy {self.__optimization_strategy} is not implemented.")
+    
 
-        return history
-
-
-    def __available_dates(self, start_date: pd.Timestamp | None = None, end_date: pd.Timestamp | None = None) -> pd.DatetimeIndex:
+    def __available_dates(
+        self,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None
+    ) -> pd.DatetimeIndex:
         """
         Returns a DatetimeIndex of available dates in the universe.
 
@@ -223,7 +191,7 @@ class Portfolio:
             datetime_index = datetime_index.union(instrument.ohlcv_df.index)
 
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df=pd.DataFrame(index=datetime_index),
+            df_with_datetime_index=pd.DataFrame(index=datetime_index),
             from_date=start_date,
             until_date=end_date
         )
@@ -235,6 +203,6 @@ class Portfolio:
         """
         Called after a property update to refresh the holdings and history.
         """
-        self.__holdings_v_kpis = self.__current_holdings_v_kpis()
-        self.__history = self.__get_history()
+        self.__holdings_v_kpis = self.__compute_holdings_v_kpis()
+        self.__history = self.__compute_history()
         return self

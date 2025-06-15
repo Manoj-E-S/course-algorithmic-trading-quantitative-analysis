@@ -1,13 +1,13 @@
 import pandas as pd
 
 
-class KpiCalculator:
+class KPICalculator:
     """
     A class to calculate various KPIs for the trading strategy.
     """
 
     def __init__(self):
-        pass
+        raise NotImplementedError("This class is not meant to be instantiated directly. Use static methods instead.")
 
 
     @staticmethod
@@ -36,23 +36,23 @@ class KpiCalculator:
 
 
     @staticmethod
-    def non_annualized_volatility(returns_series: pd.Series, downside: bool = False) -> float:
+    def non_annualized_volatility(returns: pd.Series | pd.DataFrame, downside: bool = False) -> float:
         """
-        Calculate the volatility of a returns series.
+        Calculate the volatility of a returns series/dataframe.
 
-        :param returns_series: A pandas Series of returns for the asset.
-        :type returns_series: pd.Series
+        :param returns: A pandas Series or DataFrame of returns for the asset.
+        :type returns: pd.Series | pd.DataFrame
 
         :return: The volatility as a fraction.
         :rtype: float
         """
         if downside:
-            returns_series = returns_series[returns_series < 0]
+            returns = returns[returns < 0]
 
-        if returns_series.empty or returns_series.size == 1:
+        if returns.empty or returns.size == 1:
             return 0.0
-        
-        return returns_series.std()
+
+        return returns.std()
 
 
     @staticmethod
@@ -115,7 +115,7 @@ class KpiCalculator:
     
 
     @staticmethod
-    def calmar_ratio(annual_return: float, max_drawdown: float) -> float:
+    def calamar_ratio(annual_return: float, max_drawdown: float) -> float:
         """
         Calculate the Calmar ratio.
 
