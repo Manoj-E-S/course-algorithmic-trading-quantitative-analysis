@@ -134,11 +134,11 @@ class RollingKPICalculator:
     
 
     @cached_property
-    def __cached_cumulative_calmar_ratios(self) -> pd.DataFrame:
+    def __cached_cumulative_calamar_ratios(self) -> pd.DataFrame:
         cagrs_df = self.__cached_cumulative_cagrs
         max_drawdowns_df = self.__cached_cumulative_max_drawdowns
-        calmar_ratios_df = cagrs_df.div(max_drawdowns_df)
-        return calmar_ratios_df
+        calamar_ratios_df = cagrs_df.div(max_drawdowns_df)
+        return calamar_ratios_df
     
 
     @cached_property
@@ -172,14 +172,14 @@ class RollingKPICalculator:
         return self.__cached_cumulative_max_drawdowns
 
 
-    def cumulative_calmar_ratios(self) -> pd.DataFrame:
+    def cumulative_calamar_ratios(self) -> pd.DataFrame:
         """
         Calculate the cumulative Calmar Ratio for each instrument in the prices DataFrame.
         
         :return: A DataFrame containing the cumulative Calmar Ratio (cumulative by date) for each instrument.
         :rtype: pd.DataFrame
         """
-        return self.__cached_cumulative_calmar_ratios
+        return self.__cached_cumulative_calamar_ratios
 
 
     def cumulative_annualized_volatilities(self) -> pd.DataFrame:
@@ -276,7 +276,7 @@ class RollingKPICalculator:
         """
         self.__dict__.pop('cumulative_cagrs', None)
         self.__dict__.pop('cumulative_max_drawdowns', None)
-        self.__dict__.pop('cumulative_calmar_ratios', None)
+        self.__dict__.pop('cumulative_calamar_ratios', None)
         self.__dict__.pop('cumulative_annualized_volatilities', None)
         self.__dict__.pop('cumulative_annualized_downside_volatilities', None)
 

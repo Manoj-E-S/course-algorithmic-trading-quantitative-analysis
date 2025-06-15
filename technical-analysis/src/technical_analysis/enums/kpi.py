@@ -4,7 +4,7 @@ from technical_analysis.utils.enum_helpers import EnumWithValuesList
 class KPIEnum(EnumWithValuesList):
     CAGR = "CAGR"
     MAX_DRAWDOWN = "MAX_DRAWDOWN"
-    CALMAR_RATIO = "CALMAR_RATIO"
+    CALAMAR_RATIO = "CALAMAR_RATIO"
     SHARPE_RATIO = "SHARPE_RATIO"
     SORTINO_RATIO = "SORTINO_RATIO"
     NON_ANNUALIZED_VOLATILITY = "NON_ANNUALIZED_VOLATILITY"

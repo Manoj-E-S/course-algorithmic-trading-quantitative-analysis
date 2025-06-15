@@ -224,7 +224,7 @@ class InstrumentGroupKpiPlotter:
         plt.show()
 
 
-    def plot_calmar_ratios(
+    def plot_calamar_ratios(
         self,
         title: str | None = None,
         styling: str = 'ggplot'
@@ -240,12 +240,12 @@ class InstrumentGroupKpiPlotter:
         """
         plt.style.use(styling)
         
-        calmar_ratios = {symbol: kpi.calmar_ratio() for symbol, kpi in self.__instrument_kpi.items()}
+        calamar_ratios = {symbol: kpi.calamar_ratio() for symbol, kpi in self.__instrument_kpi.items()}
 
         fig: plt.Figure = plt.figure(figsize=(10, 6))
         ax: plt.Axes = fig.add_subplot(111)
 
-        ax.bar(calmar_ratios.keys(), calmar_ratios.values(), width=0.4)
+        ax.bar(calamar_ratios.keys(), calamar_ratios.values(), width=0.4)
         ax.set_title(title or "Calmar Ratio of Instruments")
         ax.set_ylabel("Calmar Ratio")
         ax.set_xlabel("Instruments")

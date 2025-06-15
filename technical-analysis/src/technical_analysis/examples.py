@@ -398,7 +398,7 @@ def example_usage_candlestick_instrument_kpi(
         print(f"Sharpe Ratio: {kpi.sharpe_ratio(risk_free_rate=0.06)}")
         print(f"Sortino Ratio: {kpi.sortino_ratio(risk_free_rate=0.06)}")
         print(f"Max Drawdown: {kpi.max_drawdown()}")
-        print(f"Calmar Ratio: {kpi.calmar_ratio()}")
+        print(f"Calmar Ratio: {kpi.calamar_ratio()}")
         print()
 
 
@@ -434,7 +434,7 @@ def example_usage_renko_instrument_kpi(
         print(f"Sharpe Ratio: {kpi.sharpe_ratio(risk_free_rate=0.06)}")
         print(f"Sortino Ratio: {kpi.sortino_ratio(risk_free_rate=0.06)}")
         print(f"Max Drawdown: {kpi.max_drawdown()}")
-        print(f"Calmar Ratio: {kpi.calmar_ratio()}")
+        print(f"Calmar Ratio: {kpi.calamar_ratio()}")
         print()
 
 
@@ -454,7 +454,7 @@ def example_usage_instrument_group_kpi(
     instrument_group_kpi_plotter.plot_sharpe_ratios()
     instrument_group_kpi_plotter.plot_sortino_ratios()
     instrument_group_kpi_plotter.plot_max_drawdowns()
-    instrument_group_kpi_plotter.plot_calmar_ratios()
+    instrument_group_kpi_plotter.plot_calamar_ratios()
 
 
 def example_usage_candlestick_instrument_plotter(
@@ -556,50 +556,50 @@ if __name__ == "__main__":
     """
     InstrumentGroup and its Plotter
     """
-    # example_usage_instrument_group(ig)
-    # example_usage_instrument_group_plotter(ig)
+    example_usage_instrument_group(ig)
+    example_usage_instrument_group_plotter(ig)
 
 
     """
     Individual Instrument Plotters
     """
-    # example_usage_candlestick_instrument_plotter(ig)
-    # example_usage_renko_instrument_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    # example_usage_renko_instrument_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    example_usage_candlestick_instrument_plotter(ig)
+    example_usage_renko_instrument_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    example_usage_renko_instrument_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
 
 
     """
     Individual Instrument Indicators and their Plotters
     """
-    # example_usage_candlestick_instrument_indicators(ig)
-    # example_usage_candlestick_instrument_indicator_plotter(ig)
+    example_usage_candlestick_instrument_indicators(ig)
+    example_usage_candlestick_instrument_indicator_plotter(ig)
 
-    # example_usage_renko_instrument_indicators(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    # example_usage_renko_instrument_indicator_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    example_usage_renko_instrument_indicators(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    example_usage_renko_instrument_indicator_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
     
-    # example_usage_renko_instrument_indicators(from_atr=False, brick_size=brick_size, instrument_group=ig)
-    # example_usage_renko_instrument_indicator_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    example_usage_renko_instrument_indicators(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    example_usage_renko_instrument_indicator_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
 
 
     """
     Individual Instrument KPIs
     """
-    # example_usage_candlestick_instrument_kpi(ig)
-    # example_usage_renko_instrument_kpi(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    # example_usage_renko_instrument_kpi(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    example_usage_candlestick_instrument_kpi(ig)
+    example_usage_renko_instrument_kpi(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    example_usage_renko_instrument_kpi(from_atr=False, brick_size=brick_size, instrument_group=ig)
     
 
     """
     Instrument Group KPIs
     """
-    # example_usage_instrument_group_kpi(ig)
+    example_usage_instrument_group_kpi(ig)
 
 
     """
     Renko Bricks Dataframe Example
     """
-    # example_usage_renko_dataframe(from_atr=True, brick_size_from_atr=brick_size_from_atr)
-    # example_usage_renko_dataframe(from_atr=False, brick_size=brick_size)
+    example_usage_renko_dataframe(from_atr=True, brick_size_from_atr=brick_size_from_atr)
+    example_usage_renko_dataframe(from_atr=False, brick_size=brick_size)
 
 
     """

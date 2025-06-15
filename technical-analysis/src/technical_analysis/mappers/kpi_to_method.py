@@ -11,7 +11,7 @@ class KPIToMethod:
         {
             KPIEnum.CAGR                    : InstrumentKPI.cagr,
             KPIEnum.MAX_DRAWDOWN            : InstrumentKPI.max_drawdown,
-            KPIEnum.CALMAR_RATIO            : InstrumentKPI.calmar_ratio,
+            KPIEnum.CALAMAR_RATIO            : InstrumentKPI.calamar_ratio,
             KPIEnum.SHARPE_RATIO            : InstrumentKPI.sharpe_ratio,
             KPIEnum.SORTINO_RATIO           : InstrumentKPI.sortino_ratio,
             KPIEnum.ANNUALIZED_VOLATILITY   : InstrumentKPI.annualized_volatility
@@ -21,7 +21,7 @@ class KPIToMethod:
         {
             KPIEnum.CAGR                    : RollingKPICalculator.cumulative_cagrs,
             KPIEnum.MAX_DRAWDOWN            : RollingKPICalculator.cumulative_max_drawdowns,
-            KPIEnum.CALMAR_RATIO            : RollingKPICalculator.cumulative_calmar_ratios,
+            KPIEnum.CALAMAR_RATIO            : RollingKPICalculator.cumulative_calamar_ratios,
             KPIEnum.SHARPE_RATIO            : RollingKPICalculator.cumulative_sharpe_ratios,
             KPIEnum.SORTINO_RATIO           : RollingKPICalculator.cumulative_sortino_ratios,
             KPIEnum.ANNUALIZED_VOLATILITY   : RollingKPICalculator.cumulative_annualized_volatilities,

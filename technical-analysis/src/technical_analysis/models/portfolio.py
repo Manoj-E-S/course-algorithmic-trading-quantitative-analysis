@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Iterator, Literal
-import numpy as np
+
 import pandas as pd
+
 from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
 from technical_analysis.enums.kpi import KPIEnum
 from technical_analysis.enums.portfolio_optimization_strategy import PortfolioOptimizationStrategy
