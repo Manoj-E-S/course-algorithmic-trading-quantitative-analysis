@@ -64,13 +64,11 @@ class RollingKPICalculator:
         self.__row_span: CandlespanEnum = row_span
 
         self.__prices_df: pd.DataFrame = prices_df
-        self.__update_prices_df()
-
 
     # Getters
     @property
     def prices_df(self) -> pd.DataFrame:
-        return self.__prices_df
+        return self.__date_bound_prices_df()
 
     @property
     def start_date(self) -> pd.Timestamp:
@@ -82,7 +80,7 @@ class RollingKPICalculator:
 
     @property
     def date_range(self) -> pd.DatetimeIndex:
-        return self.__prices_df.index
+        return self.__date_bound_prices_df().index
     
     @property
     def row_span(self) -> CandlespanEnum:
@@ -113,21 +111,21 @@ class RollingKPICalculator:
     # Cached properties
     @cached_property
     def __cached_cumulative_cagrs(self) -> pd.DataFrame:
-        cumulative_years_series: pd.Series = (self.__prices_df.index - self.__start_date).days / 252  # trading years
+        cumulative_years_series: pd.Series = (self.__date_bound_prices_df().index - self.__start_date).days / 252  # trading years
         years = cumulative_years_series.values.reshape(-1, 1)
         
         # Replace years <= 0 with np.nan to avoid division by zero
         safe_years = np.where(years <= 0, np.nan, years)
 
-        start_prices: pd.Series = pd.Series(self.__prices_df.loc[self.__start_date])
+        start_prices: pd.Series = pd.Series(self.__date_bound_prices_df().loc[self.__start_date])
         cumulative_cagrs_df = \
-            self.__prices_df.div(start_prices).pow(1 / safe_years) - 1
+            self.__date_bound_prices_df().div(start_prices).pow(1 / safe_years) - 1
         return cumulative_cagrs_df
     
 
     @cached_property
     def __cached_cumulative_max_drawdowns(self) -> pd.DataFrame:
-        cumulative_returns_df = self.__prices_df.pct_change().fillna(0.0).add(1.0).cumprod()
+        cumulative_returns_df = self.__date_bound_prices_df().pct_change().fillna(0.0).add(1.0).cumprod()
         cumulative_peaks_df = cumulative_returns_df.cummax()
         max_drawdowns_df = cumulative_peaks_df.sub(cumulative_returns_df).div(cumulative_peaks_df).cummax(axis=0)
         return max_drawdowns_df
@@ -239,7 +237,7 @@ class RollingKPICalculator:
         :return: A DataFrame containing the annualized volatility for each instrument.
         :rtype: pd.DataFrame
         """
-        returns_df = self.__prices_df.pct_change().fillna(0.0)
+        returns_df = self.__date_bound_prices_df().pct_change().fillna(0.0)
 
         volatility_df = pd.DataFrame(index=returns_df.index, columns=returns_df.columns, dtype=float)
         for date in returns_df.index:
@@ -248,8 +246,6 @@ class RollingKPICalculator:
                 from_date=self.__start_date,
                 until_date=date
             )
-            # print(KPICalculator.non_annualized_volatility(returns_df.iloc[start_date_idx:current_date_idx + 1], downside=downside))
-            # print(volatility_df)
             volatility_df.loc[date] = KPICalculator.non_annualized_volatility(returns_df.iloc[start_date_idx:current_date_idx + 1], downside=downside)
 
         # Convert non-annualized volatility to annualized volatility based on the row span
@@ -259,28 +255,33 @@ class RollingKPICalculator:
             return volatility_df * np.sqrt(52)
         elif self.row_span == CandlespanEnum.MONTHLY:
             return volatility_df * np.sqrt(12)
+        
 
+    def __date_bound_prices_df(self) -> pd.DataFrame:
+        """
+        Get a DataFrame of prices bounded by the specified date range.
 
-    def __update_prices_df(self) -> None:
+        :return: A DataFrame containing prices within the specified date range.
+        :rtype: pd.DataFrame
         """
-        Update the prices DataFrame to only include data within the specified date range
-        """
-        self.__prices_df = self.__prices_df.loc[self.__start_date:self.__end_date]
-        self.__prices_df.index = pd.to_datetime(self.__prices_df.index)
-        self.__prices_df.sort_index(inplace=True)
+        start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
+            df_with_datetime_index=self.__prices_df,
+            from_date=self.__start_date,
+            until_date=self.__end_date
+        )
+        return self.__prices_df.iloc[start_date_idx:end_date_idx + 1]
 
     
     def __clear_cached_properties(self) -> None:
         """
         Clear cached properties to ensure they are recalculated when accessed next.
         """
-        self.__dict__.pop('cumulative_cagrs', None)
-        self.__dict__.pop('cumulative_max_drawdowns', None)
-        self.__dict__.pop('cumulative_calamar_ratios', None)
-        self.__dict__.pop('cumulative_annualized_volatilities', None)
-        self.__dict__.pop('cumulative_annualized_downside_volatilities', None)
+        self.__dict__.pop('__cached_cumulative_cagrs', None)
+        self.__dict__.pop('__cached_cumulative_max_drawdowns', None)
+        self.__dict__.pop('__cached_cumulative_calamar_ratios', None)
+        self.__dict__.pop('__cached_cumulative_annualized_volatilities', None)
+        self.__dict__.pop('__cached_cumulative_annualized_downside_volatilities', None)
 
     
     def __after_property_update(self) -> None:
-        self.__update_prices_df()
         self.__clear_cached_properties()

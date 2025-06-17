@@ -23,7 +23,6 @@ class InstrumentUniverse(InstrumentGroup):
         data_view_provider: DataViewProvider | None = None
     ):
         super().__init__(instrument_symbols, candle_span, data_view_provider)
-        self.__rolling_kpi_calculator: RollingKPICalculator = RollingKPICalculator(self.closes_df, self.candle_span)
 
 
     def kpi_history(
@@ -50,23 +49,22 @@ class InstrumentUniverse(InstrumentGroup):
         """
         if risk_free_rate_for_sharpe_and_sortino is None:
             risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
-        
-        self.__rolling_kpi_calculator.start_date = from_date
-        self.__rolling_kpi_calculator.end_date = to_date
+
+        rolling_kpi_calculator: RollingKPICalculator = RollingKPICalculator(self.closes_df, self.candle_span, from_date, to_date)
 
         kpi_dfs: dict[str, pd.DataFrame] = {}
         for kpi_enum in KPIToMethod.ForRollingKPICalculator.keys():
             kpi_df: pd.DataFrame = pd.DataFrame(
                 data=(
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(self.__rolling_kpi_calculator)()
+                        .__get__(rolling_kpi_calculator)()
                     if kpi_enum not in [KPIEnum.SHARPE_RATIO, KPIEnum.SORTINO_RATIO]
 
                     #=======================
 
                     else
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(self.__rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
+                        .__get__(rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
                 ),
                 columns=self.instrument_symbols
             )
@@ -104,15 +102,14 @@ class InstrumentUniverse(InstrumentGroup):
         if risk_free_rate_for_sharpe_and_sortino is None:
             risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
 
-        self.__rolling_kpi_calculator.start_date = overall_start_date
-        self.__rolling_kpi_calculator.end_date = snapshot_date
+        rolling_kpi_calculator: RollingKPICalculator = RollingKPICalculator(self.closes_df, self.candle_span, overall_start_date, snapshot_date)
 
         data: dict[str, pd.Series] = {}
         for kpi_enum in KPIToMethod.ForRollingKPICalculator.keys():
             kpi_series: pd.Series = pd.Series(
                 data= (
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(self.__rolling_kpi_calculator)()
+                        .__get__(rolling_kpi_calculator)()
                         .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df, snapshot_date)]
                     if kpi_enum not in [KPIEnum.SHARPE_RATIO, KPIEnum.SORTINO_RATIO]
 
@@ -120,7 +117,7 @@ class InstrumentUniverse(InstrumentGroup):
                     
                     else
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(self.__rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
+                        .__get__(rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
                         .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df, snapshot_date)]
                 )
             )

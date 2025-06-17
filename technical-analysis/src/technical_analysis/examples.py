@@ -3,6 +3,7 @@ from pprint import pprint
 import pandas as pd
 from technical_analysis.config.data_view_config import GlobalDataViewConfig
 from technical_analysis.enums.ohlcvud import OHLCVUDEnum
+from technical_analysis.enums.portfolio_optimization_strategy import PortfolioOptimizationStrategy
 from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.instrument_universe import InstrumentUniverse
@@ -556,50 +557,50 @@ if __name__ == "__main__":
     """
     InstrumentGroup and its Plotter
     """
-    example_usage_instrument_group(ig)
-    example_usage_instrument_group_plotter(ig)
+    # example_usage_instrument_group(ig)
+    # example_usage_instrument_group_plotter(ig)
 
 
     """
     Individual Instrument Plotters
     """
-    example_usage_candlestick_instrument_plotter(ig)
-    example_usage_renko_instrument_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    example_usage_renko_instrument_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    # example_usage_candlestick_instrument_plotter(ig)
+    # example_usage_renko_instrument_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    # example_usage_renko_instrument_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
 
 
     """
     Individual Instrument Indicators and their Plotters
     """
-    example_usage_candlestick_instrument_indicators(ig)
-    example_usage_candlestick_instrument_indicator_plotter(ig)
+    # example_usage_candlestick_instrument_indicators(ig)
+    # example_usage_candlestick_instrument_indicator_plotter(ig)
 
-    example_usage_renko_instrument_indicators(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    example_usage_renko_instrument_indicator_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    # example_usage_renko_instrument_indicators(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    # example_usage_renko_instrument_indicator_plotter(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
     
-    example_usage_renko_instrument_indicators(from_atr=False, brick_size=brick_size, instrument_group=ig)
-    example_usage_renko_instrument_indicator_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    # example_usage_renko_instrument_indicators(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    # example_usage_renko_instrument_indicator_plotter(from_atr=False, brick_size=brick_size, instrument_group=ig)
 
 
     """
     Individual Instrument KPIs
     """
-    example_usage_candlestick_instrument_kpi(ig)
-    example_usage_renko_instrument_kpi(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
-    example_usage_renko_instrument_kpi(from_atr=False, brick_size=brick_size, instrument_group=ig)
+    # example_usage_candlestick_instrument_kpi(ig)
+    # example_usage_renko_instrument_kpi(from_atr=True, brick_size_from_atr=brick_size_from_atr, instrument_group=ig)
+    # example_usage_renko_instrument_kpi(from_atr=False, brick_size=brick_size, instrument_group=ig)
     
 
     """
     Instrument Group KPIs
     """
-    example_usage_instrument_group_kpi(ig)
+    # example_usage_instrument_group_kpi(ig)
 
 
     """
     Renko Bricks Dataframe Example
     """
-    example_usage_renko_dataframe(from_atr=True, brick_size_from_atr=brick_size_from_atr)
-    example_usage_renko_dataframe(from_atr=False, brick_size=brick_size)
+    # example_usage_renko_dataframe(from_atr=True, brick_size_from_atr=brick_size_from_atr)
+    # example_usage_renko_dataframe(from_atr=False, brick_size=brick_size)
 
 
     """
@@ -625,10 +626,12 @@ if __name__ == "__main__":
     portfolio = Portfolio(
         number_of_holdings=10,
         source_universe=nifty_50_universe,
-        # optimization_strategy='rebalancing',
+        # optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
+        # enable_precomputed_mode=True,
+        enable_precomputed_mode=False,
         # start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        # end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
         # start_date='earliest',
+        # end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
         # end_date='latest'
     )
     end_time = datetime.now()
@@ -645,7 +648,7 @@ if __name__ == "__main__":
     pprint(portfolio.end_date)
     print()
     print("Portfolio Optimization Strategy:")
-    pprint(portfolio.optimization_strategy)
+    pprint(portfolio.optimization_strategy.value)
     print()
     print("Portfolio Number of Holdings:")
     pprint(portfolio.number_of_holdings)
@@ -658,4 +661,28 @@ if __name__ == "__main__":
     print()
     print("Portfolio Holding History:")
     pprint(portfolio.holding_history)
+    print()
+    print("Portfolio Metadata:")
+    pprint(portfolio.metadata)
+    print()
+
+    portfolio.optimize()
+    portfolio.number_of_holdings = 12
+
+    portfolio.optimize()
+    print()
+    print("Portfolio Date Range:")
+    pprint(portfolio.date_range)
+    print()
+    print("Portfolio Current Holdings:")
+    pprint(portfolio.current_holdings)
+    print()
+    print("Portfolio Current Holdings with KPIs:")
+    pprint(portfolio.current_holdings_v_kpis)
+    print()
+    print("Portfolio Holding History:")
+    pprint(portfolio.holding_history)
+    print()
+    print("Portfolio Metadata:")
+    pprint(portfolio.metadata)
     print()

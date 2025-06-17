@@ -47,6 +47,33 @@ class DataFrameDateIndexHelper:
 
 
     @staticmethod
+    def next_date(
+        df_with_datetime_index: pd.DataFrame,
+        date: pd.Timestamp
+    ) -> int:
+        """
+        Get the index of the next date after the specified date in the DataFrame that has pd.Timestamp as its index type.
+
+        :param df_with_datetime_index: A DataFrame.
+        :type df_with_datetime_index: pd.DataFrame
+
+        :param date: The date to find the next index for.
+        :type date: pd.Timestamp
+
+        :return: The index of the next date after the specified date.
+        :rtype: int
+
+        :raises IndexError: If there is no next date after the specified date in the DataFrame index.
+        """
+        current_date_index: int = DataFrameDateIndexHelper.get_nearest_date_idx(df_with_datetime_index, date=date)
+
+        if current_date_index + 1 >= len(df_with_datetime_index.index):
+            raise IndexError("There is no next date after the specified date in the DataFrame index.")
+        
+        return df_with_datetime_index.index[current_date_index + 1]
+
+
+    @staticmethod
     def resolve_date_range_to_idx_range(
         df_with_datetime_index: pd.DataFrame,
         from_date: pd.Timestamp | None = None,
@@ -84,10 +111,6 @@ class DataFrameDateIndexHelper:
 
         # Find the index of the date nearest to from_date
         from_date_idx: int = DataFrameDateIndexHelper.get_nearest_date_idx(df_with_datetime_index, date=from_date)
-
-        # Ensure at least one day range
-        if from_date_idx == until_date_idx:
-            until_date_idx += 1
 
         return from_date_idx, until_date_idx
     
