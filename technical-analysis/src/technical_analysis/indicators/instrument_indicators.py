@@ -32,10 +32,12 @@ class InstrumentIndicators:
             self.__df: pd.DataFrame = self.__instrument.candle_df
         elif isinstance(self.__instrument, Renko):
             self.__df: pd.DataFrame = self.__instrument.renko_df
+        elif isinstance(self.__instrument, Instrument):
+            self.__df: pd.DataFrame = self.__instrument.ohlcv_df
         else:
-            raise TypeError("InstrumentIndicators support is currently limited to Candlesticks and Renko.")
-        
-    
+            raise TypeError("InstrumentIndicators support is currently limited to Candlesticks, Renko, and Instrument.")
+
+
     # Getters
     @property
     def instrument(self) -> Instrument:

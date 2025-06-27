@@ -8,6 +8,7 @@ from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.instrument_universe import InstrumentUniverse
 from technical_analysis.models.portfolio import Portfolio
+from technical_analysis.portfolio_optimizers.rebalancing import RebalancingOptimizerConfig
 from technical_analysis.providers.data_cleaning import DataCleaningProvider
 from technical_analysis.providers.data_view import DataViewProvider
 from technical_analysis.kpis.instrument_kpi import InstrumentKPI
@@ -626,19 +627,23 @@ if __name__ == "__main__":
     portfolio = Portfolio(
         number_of_holdings=10,
         source_universe=nifty_50_universe,
-        # optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
-        # enable_precomputed_mode=True,
         enable_precomputed_mode=False,
-        # start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        # start_date='earliest',
+        start_date=datetime(2023, 10, 1, 0, 0, 0, 0, tzinfo=None),
         # end_date=datetime(2024, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        # end_date='latest'
+        optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
+        optimizer_config=RebalancingOptimizerConfig(
+            number_of_replacements=3,
+            allow_repeated_replacements=False,
+            risk_free_rate=DefaultConstants.RISK_FREE_RATE,
+        )
     )
     end_time = datetime.now()
     print(f"End Time: {end_time}")
     print(f"Time taken to create portfolio: {end_time - start_time}")
 
     # print(portfolio._Portfolio__holdings_v_kpis_as_of_date(pd.Timestamp('2023-09-29')))
+
+    portfolio.optimize().optimize().optimize()
 
     print()
     print("Portfolio Start Date:")
@@ -665,24 +670,50 @@ if __name__ == "__main__":
     print("Portfolio Metadata:")
     pprint(portfolio.metadata)
     print()
+    print("Portfolio KPIs:")
+    pprint(portfolio.portfolio_kpis)
+    print()
 
-    portfolio.optimize()
-    portfolio.number_of_holdings = 12
+    nifty_50_index_kpi = InstrumentKPI(nifty_50_index)
+    nifty_50_index_plotter = InstrumentPlotter(nifty_50_index)
+    nifty_50_index_plotter.plot_price_line(
+        # title="Nifty 50 Index Price Line"
+    )
+    # sensex_30_index_kpi = InstrumentKPI(sensex_30_index)
 
-    portfolio.optimize()
+    trent = Instrument(
+        instrument_symbol='TRENT.BSE',
+        candle_span=CandlespanEnum.MONTHLY
+    )
+    trent_plotter = InstrumentPlotter(trent)
+    trent_plotter.plot_price_line(
+        # title="Trent Price Line"
+    )
+
+    heromotoco = Instrument(
+        instrument_symbol='HEROMOTOCO.BSE',
+        candle_span=CandlespanEnum.MONTHLY
+    )
+    heromotoco_plotter = InstrumentPlotter(heromotoco)
+    heromotoco_plotter.plot_price_line(
+        # title="Hero MotoCorp Price Line"
+    )
+
     print()
-    print("Portfolio Date Range:")
-    pprint(portfolio.date_range)
+    print(f"Nifty 50 Index: {nifty_50_index_kpi.instrument.instrument_symbol}")
     print()
-    print("Portfolio Current Holdings:")
-    pprint(portfolio.current_holdings)
-    print()
-    print("Portfolio Current Holdings with KPIs:")
-    pprint(portfolio.current_holdings_v_kpis)
-    print()
-    print("Portfolio Holding History:")
-    pprint(portfolio.holding_history)
-    print()
-    print("Portfolio Metadata:")
-    pprint(portfolio.metadata)
+    print("CAGR:")
+    print(nifty_50_index_kpi.cagr(portfolio.start_date, portfolio.end_date))
+    print("Max Drawdown:")
+    print(nifty_50_index_kpi.max_drawdown(from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Calmar Ratio:")
+    print(nifty_50_index_kpi.calamar_ratio(from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Sharpe Ratio:")
+    print(nifty_50_index_kpi.sharpe_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Sortino Ratio:")
+    print(nifty_50_index_kpi.sortino_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Annualized Volatility:")
+    print(nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date))
+    print("Annualized Downside Volatility:")
+    print(nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date, downside=True))
     print()

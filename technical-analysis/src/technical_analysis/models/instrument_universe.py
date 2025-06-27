@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
@@ -15,6 +16,10 @@ class InstrumentUniverse(InstrumentGroup):
     A class that represents a universe of financial instruments.
     This class is a specialized version of InstrumentGroup, designed to manage a collection of instruments.
     """
+
+    # Constants
+    _Number_Of_Holdings_Column_Name: str = "NUMBER_OF_HOLDINGS"
+
 
     def __init__(
         self,
@@ -71,6 +76,7 @@ class InstrumentUniverse(InstrumentGroup):
             kpi_dfs[kpi_enum.value] = kpi_df
 
         combined_df: pd.DataFrame = pd.concat(kpi_dfs.values(), keys=kpi_dfs.keys(), names=['kpi', 'date']).stack().unstack(level='kpi')
+        combined_df[InstrumentUniverse._Number_Of_Holdings_Column_Name] = np.ones(combined_df.shape[0], dtype='int32')
         combined_df.columns.name = 'kpi'
         combined_df.index.names = ['date', 'symbol']
         combined_df.sort_index(level='date', inplace=True)
@@ -125,6 +131,7 @@ class InstrumentUniverse(InstrumentGroup):
             data[kpi_enum.value] = kpi_series
         
         df: pd.DataFrame = pd.DataFrame.from_dict(data, orient='index').T
+        df[InstrumentUniverse._Number_Of_Holdings_Column_Name] = np.ones(df.shape[0], dtype='int32')
         df.columns.name = 'kpi'
         df.index.names = ['symbol']
         return df

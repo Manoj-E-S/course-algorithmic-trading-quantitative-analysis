@@ -30,8 +30,10 @@ class InstrumentPlotter:
             self.__df: pd.DataFrame = source_instrument.candle_df
         elif isinstance(source_instrument, Renko):
             self.__df = source_instrument.renko_df
+        elif isinstance(source_instrument, Instrument):
+            self.__df = source_instrument.ohlcv_df
         else:
-            raise TypeError("InstrumentPlotter support is currently limited to Candlesticks and Renko.")
+            raise TypeError("InstrumentPlotter support is currently limited to Candlesticks, Renko, and Instrument.")
 
 
     # Getters
