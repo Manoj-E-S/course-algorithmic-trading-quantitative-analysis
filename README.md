@@ -1,4 +1,4 @@
-# course-algorithmic-trading-quantitative-analysis
+# Technical Analysis and portfolio management tool
 A tool to aid in the technical analysis of stocks and optimization of portfolios.
 
 ### Current Objective
