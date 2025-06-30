@@ -151,16 +151,14 @@ class RebalancingOptimizer(BaseOptimizer):
                 )
             )
 
-        top_possible_replacements = (
+        replacements = (
             possible_replacements
-            .drop(axis=0, labels=current_holdings_v_kpis.index, errors='ignore')
-            # .loc[~possible_replacements.index.isin(current_holdings_v_kpis.index)]
-            # .sort_values(KPIEnum.CAGR.value, ascending=False)
+            .drop(axis=0, labels=current_holdings_v_kpis.index)
             .head(self.__config.number_of_replacements)
         )
         return (
             pd.concat(
-                [current_holdings_v_kpis, top_possible_replacements],
+                [current_holdings_v_kpis, replacements],
                 axis=0
             ).sort_values(
                 KPIEnum.CAGR.value,
