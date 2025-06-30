@@ -47,12 +47,12 @@ class KPICalculator:
         :rtype: float
         """
         if downside:
-            returns = returns[returns < 0]
+            returns = returns[returns < 0].fillna(0)
 
-        if returns.empty or returns.size == 1:
+        if returns.empty:
             return 0.0
 
-        return returns.std()
+        return returns.std(skipna=True, ddof=0)
 
 
     @staticmethod
@@ -92,7 +92,10 @@ class KPICalculator:
         :return: The Sortino ratio.
         :rtype: float
         """
-        return (expected_returns - risk_free_rate) / downside_volatility if downside_volatility else 0.0
+        if downside_volatility == 0:
+            return float('inf')
+    
+        return (expected_returns - risk_free_rate) / downside_volatility
     
 
     @staticmethod
@@ -131,5 +134,5 @@ class KPICalculator:
         if max_drawdown == 0:
             return float('inf')
         
-        return annual_return / abs(max_drawdown)
+        return annual_return / max_drawdown
     

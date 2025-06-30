@@ -1,3 +1,4 @@
+from pprint import pprint
 from technical_analysis.portfolio_optimizers.base import BaseOptimizer
 from technical_analysis.utils.enum_helpers import EnumWithValuesList
 
@@ -40,11 +41,14 @@ class PortfolioOptimizationStrategy(EnumWithValuesList):
         """
         if strategy == cls.DEFAULT:
             from technical_analysis.portfolio_optimizers.base import BaseOptimizer, _DefaultResolvedOptimizerConfig
+            print("Creating Default Optimizer with config:")
+            pprint(config)
             return BaseOptimizer(_DefaultResolvedOptimizerConfig(**config))
 
         elif strategy == cls.REBALANCING:
             from technical_analysis.portfolio_optimizers.rebalancing import RebalancingOptimizer, _RebalancingResolvedOptimizerConfig
-            print("Creating Rebalancing Optimizer with config:", config)
+            print("Creating Rebalancing Optimizer with config:")
+            pprint(config)
             return RebalancingOptimizer(_RebalancingResolvedOptimizerConfig(**config))
 
         raise ValueError(f"Unsupported portfolio optimization strategy: {strategy}")

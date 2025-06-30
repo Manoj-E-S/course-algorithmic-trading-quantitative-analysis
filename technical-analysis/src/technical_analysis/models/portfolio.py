@@ -1,10 +1,14 @@
 from dataclasses import asdict
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 
+from technical_analysis.enums.agg_fn import AggregatorFunctionEnum
 from technical_analysis.enums.kpi import KPIEnum
 from technical_analysis.enums.portfolio_optimization_strategy import PortfolioOptimizationStrategy
+from technical_analysis.mappers.aggfn_to_name import AggFnToName
+from technical_analysis.mappers.kpi_to_aggfn import KPIToAggFn
 from technical_analysis.models.instrument_universe import InstrumentUniverse
 from technical_analysis.portfolio_optimizers.base import BaseOptimizer, DefaultOptimizerConfig
 from technical_analysis.utils.dataframe_date_helper import DataFrameDateIndexHelper
@@ -28,8 +32,8 @@ class Portfolio:
         if optimizer_config is None:
             optimizer_config = DefaultOptimizerConfig()
 
-        if enable_precomputed_mode and end_date is not None:
-            raise ValueError("In precomputed mode, end date is meaningless. Either do not provide this parameter, or create a new portfolio in incremental mode.")
+        if not enable_precomputed_mode and end_date is not None:
+            raise ValueError("In incremental mode, end date is meaningless. Either do not provide this parameter, or create a new portfolio in precomputed mode.")
 
         self.__universe: InstrumentUniverse = source_universe
         self.__number_of_holdings: int = number_of_holdings
@@ -76,9 +80,9 @@ class Portfolio:
         return self.__end_date
 
     @property
-    def current_holdings(self) -> list[str]:
-        return list(self.__holdings_v_kpis.index)
-    
+    def current_holdings(self) -> pd.DataFrame:
+        return self.__holdings_v_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name].to_frame()
+
     @property
     def current_holdings_v_kpis(self) -> pd.DataFrame:
         return self.__holdings_v_kpis
@@ -105,20 +109,25 @@ class Portfolio:
         return not self.__precomputed
     
     @property
-    def portfolio_kpis(self) -> pd.Series:
-        return self.__holdings_v_kpis.agg(
-            {
-                KPIEnum.CAGR.value: 'mean',
-                KPIEnum.MAX_DRAWDOWN.value: 'max',
-                KPIEnum.CALAMAR_RATIO.value: 'mean',
-                KPIEnum.SHARPE_RATIO.value: 'mean',
-                KPIEnum.SORTINO_RATIO.value: 'mean',
-                KPIEnum.ANNUALIZED_VOLATILITY.value: 'mean',
-                KPIEnum.ANNUALIZED_DOWNSIDE_VOLATILITY.value: 'mean',
-                InstrumentUniverse._Number_Of_Holdings_Column_Name: 'sum'
-            },
-            axis='index'
-        )
+    def portfolio_kpis(self) -> pd.DataFrame:
+        rows = []
+        for kpi, agg_fn in KPIToAggFn.Mapper.items():
+            series: pd.Series = self.__holdings_v_kpis[kpi.value]
+
+            agg_val: float = agg_fn(series)
+            agg_method: str = AggFnToName.Mapper.get(agg_fn, "UNKNOWN")
+            contributing_instrument: str = self.__find_contributing_instrument_for_aggregator(series, agg_fn)
+
+            rows.append({
+                "kpi_value": agg_val,
+                "agg_method": agg_method,
+                "max_contrib_value": series[contributing_instrument] if contributing_instrument in series.index else "N/A",
+                "max_contrib_symbol": contributing_instrument,
+            })
+
+        portfolio_kpis_df = pd.DataFrame(data=rows, index=KPIEnum.values())
+        portfolio_kpis_df.index.name = "kpi"
+        return portfolio_kpis_df
 
 
     # Chainable Setters
@@ -386,3 +395,29 @@ class Portfolio:
             return
         
         self.__precomputation_done_ = False
+
+    
+    def __find_contributing_instrument_for_aggregator(self, series: pd.Series, agg_fn: AggregatorFunctionEnum) -> str:
+        """
+        Finds the instrument that contributes the most to the aggregation function.
+
+        :param series: The series of values for the KPI.
+        :type series: pd.Series
+
+        :param agg_fn: The aggregation function used.
+        :type agg_fn: AggregatorFunctionEnum
+
+        :return: The symbol of the instrument contributing the most to the aggregation.
+        :rtype: str
+        """
+        if agg_fn == AggregatorFunctionEnum.MEAN_FN:
+            return series.idxmax() if not series.empty else "N/A"
+        
+        if agg_fn == AggregatorFunctionEnum.MEAN_OF_FINITES_FN:
+            finite_series = series[np.isfinite(series)]
+            return finite_series.idxmax() if not finite_series.empty else "N/A"
+        
+        if agg_fn == AggregatorFunctionEnum.MAX_FN:
+            return series.idxmax() if not series.empty else "N/A"
+
+        return "N/A"
