@@ -34,10 +34,10 @@ class InstrumentUniverse(InstrumentGroup):
         self,
         from_date: pd.Timestamp,
         to_date: pd.Timestamp,
-        risk_free_rate_for_sharpe_and_sortino: float | None = None,
+        rf_sharpe_sortino: float | None = None,
     ) -> pd.DataFrame:
         """
-        Get the KPI history over a specified date range.
+        Get the KPI history of instruments in the uiverse over a specified date range.
         This method calculates cumulative KPIs for the instruments in the universe over a specified date range.
 
         :param from_date: The start date of the date range.
@@ -46,14 +46,14 @@ class InstrumentUniverse(InstrumentGroup):
         :param to_date: The end date of the date range.
         :type to_date: pd.Timestamp
         
-        :param risk_free_rate_for_sharpe_and_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
-        :type risk_free_rate_for_sharpe_and_sortino: float
+        :param rf_sharpe_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
+        :type rf_sharpe_sortino: float
         
         :return: A DataFrame containing the cumulative KPIs for each instrument in the universe over the specified date range.
         :rtype: pd.DataFrame
         """
-        if risk_free_rate_for_sharpe_and_sortino is None:
-            risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
+        if rf_sharpe_sortino is None:
+            rf_sharpe_sortino = GlobalRiskFreeRateConfig.get()
 
         rolling_kpi_calculator: RollingKPICalculator = RollingKPICalculator(self.closes_df, self.candle_span, from_date, to_date)
 
@@ -69,7 +69,7 @@ class InstrumentUniverse(InstrumentGroup):
 
                     else
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
+                        .__get__(rolling_kpi_calculator)(risk_free_rate=rf_sharpe_sortino)
                 ),
                 columns=self.instrument_symbols
             )
@@ -87,7 +87,7 @@ class InstrumentUniverse(InstrumentGroup):
         self,
         overall_start_date: pd.Timestamp,
         snapshot_date: pd.Timestamp,
-        risk_free_rate_for_sharpe_and_sortino: float | None = None,
+        rf_sharpe_sortino: float | None = None,
     ) -> pd.DataFrame:
         """
         Get a snapshot of KPIs for the instruments in the universe at a specific date.
@@ -99,14 +99,14 @@ class InstrumentUniverse(InstrumentGroup):
         :param snapshot_date: The date for which the KPI snapshot is taken.
         :type snapshot_date: pd.Timestamp
         
-        :param risk_free_rate_for_sharpe_and_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
-        :type risk_free_rate_for_sharpe_and_sortino: float | None
+        :param rf_sharpe_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
+        :type rf_sharpe_sortino: float | None
         
         :return: A DataFrame containing the KPIs for each instrument in the universe at the specified date.
         :rtype: pd.DataFrame
         """
-        if risk_free_rate_for_sharpe_and_sortino is None:
-            risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
+        if rf_sharpe_sortino is None:
+            rf_sharpe_sortino = GlobalRiskFreeRateConfig.get()
 
         rolling_kpi_calculator: RollingKPICalculator = RollingKPICalculator(self.closes_df, self.candle_span, overall_start_date, snapshot_date)
 
@@ -116,15 +116,15 @@ class InstrumentUniverse(InstrumentGroup):
                 data= (
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
                         .__get__(rolling_kpi_calculator)()
-                        .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df, snapshot_date)]
+                        .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df.index, snapshot_date)]
                     if kpi_enum not in [KPIEnum.SHARPE_RATIO, KPIEnum.SORTINO_RATIO]
 
                     #=======================
                     
                     else
                     KPIToMethod.ForRollingKPICalculator[kpi_enum]
-                        .__get__(rolling_kpi_calculator)(risk_free_rate=risk_free_rate_for_sharpe_and_sortino)
-                        .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df, snapshot_date)]
+                        .__get__(rolling_kpi_calculator)(risk_free_rate=rf_sharpe_sortino)
+                        .loc[DataFrameDateIndexHelper.get_nearest_date(self.closes_df.index, snapshot_date)]
                 )
             )
             kpi_series.name = kpi_enum.value
@@ -137,12 +137,12 @@ class InstrumentUniverse(InstrumentGroup):
         return df
 
 
-    def instruments_sorted_by_kpi_for_date_snapshot(
+    def sorted_kpi_snapshot(
         self,
-        by_which_kpi: KPIEnum,
+        sort_by: KPIEnum,
         overall_start_date: pd.Timestamp,
         snapshot_date: pd.Timestamp,
-        risk_free_rate_for_sharpe_and_sortino: float | None = None,
+        rf_sharpe_sortino: float | None = None,
         ascending: bool = True,
         top_n: int | None = None,
     ) -> pd.DataFrame:
@@ -150,8 +150,8 @@ class InstrumentUniverse(InstrumentGroup):
         Get a sorted DataFrame of instruments based on a specific KPI at a given date snapshot.
         This method retrieves the KPI snapshot for the instruments in the universe at a specific date and sorts them by the specified KPI.
         
-        :param by_which_kpi: The KPI by which to sort the instruments.
-        :type by_which_kpi: KPIEnum
+        :param sort_by: The KPI by which to sort the instruments.
+        :type sort_by: KPIEnum
         
         :param overall_start_date: The start date of the overall period for which KPIs are calculated.
         :type overall_start_date: pd.Timestamp
@@ -159,8 +159,8 @@ class InstrumentUniverse(InstrumentGroup):
         :param snapshot_date: The date for which the KPI snapshot is taken.
         :type snapshot_date: pd.Timestamp
 
-        :param risk_free_rate_for_sharpe_and_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
-        :type risk_free_rate_for_sharpe_and_sortino: float | None
+        :param rf_sharpe_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
+        :type rf_sharpe_sortino: float | None
         
         :param ascending: Whether to sort the KPI values in ascending order. Default is True.
         :type ascending: bool
@@ -173,15 +173,15 @@ class InstrumentUniverse(InstrumentGroup):
         
         :raises ValueError: If the specified KPI is not available in the KPI DataFrame.
         """
-        if risk_free_rate_for_sharpe_and_sortino is None:
-            risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
+        if rf_sharpe_sortino is None:
+            rf_sharpe_sortino = GlobalRiskFreeRateConfig.get()
 
-        kpi_df: pd.DataFrame = self.kpi_snapshot(overall_start_date, snapshot_date, risk_free_rate_for_sharpe_and_sortino)
+        kpi_df: pd.DataFrame = self.kpi_snapshot(overall_start_date, snapshot_date, rf_sharpe_sortino)
 
-        if by_which_kpi.value not in kpi_df.columns:
-            raise ValueError(f"KPI '{by_which_kpi.value}' is not available in the KPI DataFrame.")
+        if sort_by.value not in kpi_df.columns:
+            raise ValueError(f"KPI '{sort_by.value}' is not available in the KPI DataFrame.")
 
-        kpi_df.sort_values(by=by_which_kpi.value, ascending=ascending, inplace=True)
+        kpi_df.sort_values(by=sort_by.value, ascending=ascending, inplace=True)
         
         if top_n:
             return kpi_df.head(top_n)
@@ -189,21 +189,21 @@ class InstrumentUniverse(InstrumentGroup):
         return kpi_df
     
 
-    def instrument_history_sorted_by_kpi_per_date_for_date_range(
+    def sorted_kpi_history(
         self,
-        by_which_kpi: KPIEnum,
+        sort_by: KPIEnum,
         period_start_date: pd.Timestamp,
         period_end_date: pd.Timestamp,
         ascending: bool = True,
-        risk_free_rate_for_sharpe_and_sortino: float | None = None,
+        rf_sharpe_sortino: float | None = None,
         top_n: int | None = None,
     ) -> pd.DataFrame:
         """
         Get a DataFrame of instruments sorted by a specific KPI for each date in a given date range.
         This method retrieves the KPI history for the instruments in the universe over a specified date range and sorts them by the specified KPI for each date.
         
-        :param by_which_kpi: The KPI by which to sort the instruments.
-        :type by_which_kpi: KPIEnum
+        :param sort_by: The KPI by which to sort the instruments.
+        :type sort_by: KPIEnum
         
         :param period_start_date: The start date of the period for which the KPI history is retrieved.
         :type period_start_date: pd.Timestamp
@@ -211,8 +211,8 @@ class InstrumentUniverse(InstrumentGroup):
         :param period_end_date: The end date of the period for which the KPI history is retrieved.
         :type period_end_date: pd.Timestamp
         
-        :param risk_free_rate_for_sharpe_and_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
-        :type risk_free_rate_for_sharpe_and_sortino: float
+        :param rf_sharpe_sortino: The risk-free rate to use for Sharpe and Sortino ratios. If None, uses the global risk-free rate.
+        :type rf_sharpe_sortino: float
         
         :param ascending: Whether to sort the KPI values in ascending order. Default is True.
         :type ascending: bool
@@ -225,17 +225,17 @@ class InstrumentUniverse(InstrumentGroup):
         
         :raises ValueError: If the specified KPI is not available in the KPI DataFrame.
         """
-        if risk_free_rate_for_sharpe_and_sortino is None:
-            risk_free_rate_for_sharpe_and_sortino = GlobalRiskFreeRateConfig.get()
+        if rf_sharpe_sortino is None:
+            rf_sharpe_sortino = GlobalRiskFreeRateConfig.get()
         
         kpi_history_df: pd.DataFrame = self.kpi_history(
             from_date=period_start_date,
             to_date=period_end_date,
-            risk_free_rate_for_sharpe_and_sortino=risk_free_rate_for_sharpe_and_sortino
+            rf_sharpe_sortino=rf_sharpe_sortino
         )
 
-        if by_which_kpi.value not in kpi_history_df.columns:
-            raise ValueError(f"KPI '{by_which_kpi.value}' is not available in the KPI DataFrame.")
+        if sort_by.value not in kpi_history_df.columns:
+            raise ValueError(f"KPI '{sort_by.value}' is not available in the KPI DataFrame.")
 
         kpi_history_df.sort_index(level='date', inplace=True)
         
@@ -243,9 +243,9 @@ class InstrumentUniverse(InstrumentGroup):
             return\
                 kpi_history_df\
                 .groupby(level='date', group_keys=False)\
-                .apply(lambda g: g.sort_values(by=by_which_kpi.value, ascending=ascending).head(top_n))
+                .apply(lambda g: g.sort_values(by=sort_by.value, ascending=ascending).head(top_n))
         
         return\
             kpi_history_df\
             .groupby(level='date', group_keys=False)\
-            .apply(lambda g: g.sort_values(by=by_which_kpi.value, ascending=ascending))
+            .apply(lambda g: g.sort_values(by=sort_by.value, ascending=ascending))

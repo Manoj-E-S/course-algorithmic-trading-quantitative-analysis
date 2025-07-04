@@ -8,6 +8,7 @@ from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.instrument_universe import InstrumentUniverse
 from technical_analysis.models.portfolio import Portfolio
+from technical_analysis.portfolio_optimizers.top_picks import TopPicksOptimizerConfig
 from technical_analysis.portfolio_optimizers.rebalancing import RebalancingOptimizerConfig
 from technical_analysis.providers.data_cleaning import DataCleaningProvider
 from technical_analysis.providers.data_view import DataViewProvider
@@ -539,7 +540,7 @@ def example_usage_renko_dataframe(
 
 
 
-if __name__ == "__main__":
+def main():
     """
     Configure the global data view provider and response caching.
     """
@@ -550,10 +551,10 @@ if __name__ == "__main__":
     """
     Some default constants for example usage.
     """
-    instrument: str = DefaultConstants.SAMPLE_INSTRUMENT
-    ig: InstrumentGroup = default_instrument_group()
-    brick_size_from_atr: tuple[CandlespanEnum, int] = DefaultConstants.BRICK_SIZE_FROM_ATR
-    brick_size: int = DefaultConstants.BRICK_SIZE
+    # instrument: str = DefaultConstants.SAMPLE_INSTRUMENT
+    # ig: InstrumentGroup = default_instrument_group()
+    # brick_size_from_atr: tuple[CandlespanEnum, int] = DefaultConstants.BRICK_SIZE_FROM_ATR
+    # brick_size: int = DefaultConstants.BRICK_SIZE
 
     """
     InstrumentGroup and its Plotter
@@ -605,18 +606,8 @@ if __name__ == "__main__":
 
 
     """
-    Portfolio and Instrument Universe
+    Portfolio Optimization Example
     """
-    nifty_50_index: Instrument = Instrument(
-        instrument_symbol='NIFTYBEES.BSE',
-        candle_span=CandlespanEnum.MONTHLY
-    )
-
-    sensex_30_index: Instrument = Instrument(
-        instrument_symbol='SENSEXBEES.BSE',
-        candle_span=CandlespanEnum.MONTHLY
-    )
-
     nifty_50_universe = InstrumentUniverse(
         instrument_symbols=DefaultConstants.NIFTY_50_UNIVERSE,
         candle_span=CandlespanEnum.MONTHLY
@@ -641,9 +632,10 @@ if __name__ == "__main__":
     print(f"End Time: {end_time}")
     print(f"Time taken to create portfolio: {end_time - start_time}")
 
-    # print(portfolio._Portfolio__holdings_v_kpis_as_of_date(pd.Timestamp('2023-09-29')))
-
-    # portfolio.optimize().optimize().optimize()
+    # portfolio.step_up(3)
+    # portfolio.step_back(3)
+    # portfolio.step_to(datetime(2015, 5, 1, 0, 0, 0, 0, tzinfo=None))
+    # portfolio.step_to(datetime(2011, 2, 1, 0, 0, 0, 0, tzinfo=None))
 
     print()
     print("Portfolio Start Date:")
@@ -661,8 +653,8 @@ if __name__ == "__main__":
     print("Portfolio Current Holdings:")
     pprint(portfolio.current_holdings)
     print()
-    print("Portfolio Current Holdings with KPIs:")
-    pprint(portfolio.current_holdings_v_kpis)
+    print("Portfolio Current KPIs:")
+    pprint(portfolio.current_holdings_kpis)
     print()
     print("Portfolio Holding History:")
     pprint(portfolio.holding_history)
@@ -674,31 +666,19 @@ if __name__ == "__main__":
     pprint(portfolio.portfolio_kpis)
     print()
 
-    nifty_50_index_kpi = InstrumentKPI(nifty_50_index)
-    nifty_50_index_plotter = InstrumentPlotter(nifty_50_index)
-    nifty_50_index_plotter.plot_price_line(
-        # title="Nifty 50 Index Price Line"
+
+    """
+    Compare Portfolio KPIs with with the corresponding Index's KPIs.
+    """
+    sensex_30_index: Instrument = Instrument(
+        instrument_symbol='SENSEXBEES.BSE',
+        candle_span=CandlespanEnum.MONTHLY
     )
-    # sensex_30_index_kpi = InstrumentKPI(sensex_30_index)
-
-    # trent = Instrument(
-    #     instrument_symbol='TRENT.BSE',
-    #     candle_span=CandlespanEnum.MONTHLY
-    # )
-    # trent_plotter = InstrumentPlotter(trent)
-    # trent_plotter.plot_price_line(
-    #     # title="Trent Price Line"
-    # )
-
-    # heromotoco = Instrument(
-    #     instrument_symbol='HEROMOTOCO.BSE',
-    #     candle_span=CandlespanEnum.MONTHLY
-    # )
-    # heromotoco_plotter = InstrumentPlotter(heromotoco)
-    # heromotoco_plotter.plot_price_line(
-    #     # title="Hero MotoCorp Price Line"
-    # )
-
+    nifty_50_index: Instrument = Instrument(
+        instrument_symbol='NIFTYBEES.BSE',
+        candle_span=CandlespanEnum.MONTHLY
+    )
+    nifty_50_index_kpi = InstrumentKPI(nifty_50_index)
     print()
     print(f"Nifty 50 Index: {nifty_50_index_kpi.instrument.instrument_symbol}")
     print()
@@ -710,3 +690,17 @@ if __name__ == "__main__":
     print("Annualized Volatility\t\t:", nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date))
     print("Annualized Downside Volatility\t:", nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date, downside=True))
     print()
+
+
+if __name__ == "__main__":
+    main()
+
+    # # Uncomment the following lines to profile the performance of the main function.
+    # import cProfile
+    # import pstats
+
+    # with cProfile.Profile() as pr:
+    #     main()
+
+    # stats = pstats.Stats(pr)
+    # stats.sort_stats("cumulative").print_stats(20)  # top 20

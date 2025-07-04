@@ -2,52 +2,50 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
 from technical_analysis.enums.kpi import KPIEnum
 from technical_analysis.models.instrument_universe import InstrumentUniverse
-from technical_analysis.portfolio_optimizers.base import _DefaultResolvedOptimizerConfig, BaseOptimizer, DefaultOptimizerConfig
-from technical_analysis.utils.dataframe_date_helper import DataFrameDateIndexHelper
+from technical_analysis.portfolio_optimizers._base import Optimizer
+from technical_analysis.portfolio_optimizers.mixins.optimization import OptimizationMixin
+from technical_analysis.portfolio_optimizers.mixins.optimization_history import OptimizationHistoryMixin
+from technical_analysis.portfolio_optimizers.top_picks import _OptimizerResolvedConfig, OptimizerConfig
 from technical_analysis.utils.decorators import override
 
 
-@dataclass
-class RebalancingOptimizerConfig:
+@dataclass(kw_only=True)
+class RebalancingOptimizerConfig(OptimizerConfig):
     # User facing configuration
     """
     Config for Rebalancing optimization strategy.
 
-    Fields:
+    Extends :class:`OptimizerConfig`.
+
+    :Fields:
     - number_of_replacements: int
     - allow_repeated_replacements: bool (default - True)
     - risk_free_rate: float (default - global risk-free rate)
     """
     number_of_replacements: int
-    allow_repeated_replacements: bool = field(default_factory=lambda: True)
-    risk_free_rate: float = field(default_factory=GlobalRiskFreeRateConfig.get)
+    allow_repeated_replacements: bool = field(default=True)
 
 
-@dataclass
-class _RebalancingResolvedOptimizerConfig:
+@dataclass(kw_only=True)
+class _RebalancingResolvedOptimizerConfig(_OptimizerResolvedConfig, RebalancingOptimizerConfig):
     # Internally used configuration
     """
     Internal resolved config for Rebalancing optimization strategy.
 
-    Fields:
+    Extends :class:`_OptimizerResolvedConfig` and :class:`RebalancingOptimizerConfig`.
+
+    :Fields:
     - universe: InstrumentUniverse
     - number_of_holdings: int
     - start_date: pd.Timestamp
     - end_date: pd.Timestamp
+    - in_precomputed_mode: bool
     - number_of_replacements: int
     - allow_repeated_replacements: bool (default - True)
     - risk_free_rate: float (default - global risk-free rate)
     """
-    universe: InstrumentUniverse
-    number_of_holdings: int
-    start_date: pd.Timestamp
-    end_date: pd.Timestamp
-    number_of_replacements: int
-    allow_repeated_replacements: bool = field(default_factory=lambda: True)
-    risk_free_rate: float = field(default_factory=GlobalRiskFreeRateConfig.get)
     
     def __post_init__(self):
         # Ensure that the number of replacements does not exceed the number of holdings
@@ -55,179 +53,148 @@ class _RebalancingResolvedOptimizerConfig:
             raise ValueError("Number of replacements cannot be greater than the number of holdings.")
 
 
-class RebalancingOptimizer(BaseOptimizer):
+class RebalancingOptimizer(OptimizationHistoryMixin, OptimizationMixin, Optimizer):
     """
-    This class implements the rebalancing portfolio optimization strategy.
+    This is the portfolio optimizer that implements the Rebalancing strategy.
 
     Strategy:
-    - Start with the best n instruments in the universe (n = number of holdings in the portfolio)
-    - Replace x worst performing holdings in the portfolio with the x so-far best-performing instruments in the universe. (x = number of replacements)
+    - Start with the best `n` instruments in the universe `(n = number of holdings in the portfolio)`
+    - Replace `x` worst performing holdings in the portfolio with the `x` so-far best-performing instruments in the universe. `(x = number of replacements)`
     - Replacement happens for every period
     """
     
+
     def __init__(
         self,
         config: _RebalancingResolvedOptimizerConfig
     ):
-        self.__config = config
+        self._config = config
 
 
     @property
     def config(self) -> _RebalancingResolvedOptimizerConfig:
-        return self.__config
-    
+        """
+        Returns the configuration of the Rebalancing optimizer.
+
+        :return: The configuration of the Rebalancing optimizer.
+        :rtype: _RebalancingResolvedOptimizerConfig
+        """
+        return self._config
+
 
     @override
-    def init_holdings_v_kpis(self) -> pd.DataFrame:
+    def init_current_holdings_kpis(self) -> pd.DataFrame:
         """
         Initializes the holdings with their KPIs as a DataFrame as per the rebalancing strategy.
 
         :return pd.DataFrame: The holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
         """
-        return self.__config.universe.instruments_sorted_by_kpi_for_date_snapshot(
-            by_which_kpi=KPIEnum.CAGR,
-            overall_start_date=self.__config.start_date,
-            snapshot_date=self.__config.end_date,
-            risk_free_rate_for_sharpe_and_sortino=self.__config.risk_free_rate,
+        return self._config.universe.sorted_kpi_snapshot(
+            sort_by=KPIEnum.CAGR,
+            overall_start_date=self._config.start_date,
+            snapshot_date=self._config.end_date,
+            rf_sharpe_sortino=self._config.risk_free_rate,
             ascending=False,
-            top_n=self.__config.number_of_holdings
+            top_n=self._config.number_of_holdings
         )
 
     
     @override
-    def update_holdings_v_kpis(self, current_holdings_v_kpis: pd.DataFrame) -> pd.DataFrame:
+    def update_current_holdings_kpis(self, current_holdings_kpis: pd.DataFrame) -> pd.DataFrame:
         """
         Updates the current holdings with their KPIs as a DataFrame as per the rebalancing strategy.
 
-        :param current_holdings_v_kpis: The current holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
-        :type current_holdings_v_kpis: pd.DataFrame
+        :param current_holdings_kpis: The current holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
+        :type current_holdings_kpis: pd.DataFrame
 
         :return pd.DataFrame: The holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
         """
-        current_holdings_v_kpis = (
-            self.__config.universe.instruments_sorted_by_kpi_for_date_snapshot(
-                by_which_kpi=KPIEnum.CAGR,
-                overall_start_date=self.__config.start_date,
-                snapshot_date=self.__config.end_date,
-                risk_free_rate_for_sharpe_and_sortino=self.__config.risk_free_rate,
-                ascending=False
-            )
-            .loc[current_holdings_v_kpis.index]
+        latest_synced_holdings = self.__sync_current_holdings_kpis_to_latest(current_holdings_kpis)
+        retained_holdings = self.__remove_underperforming_instruments(latest_synced_holdings)
+        possible_replacements = self.__get_possible_replacements()
+
+        if self._config.allow_repeated_replacements:
+            return self.__replace_with_repeats(retained_holdings, possible_replacements)
+        else:
+            return self.__replace_without_repeats(retained_holdings, possible_replacements)
+    
+
+    @override
+    def precompute(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Precomputes the holdings and history dataframes.
+
+        :return: A tuple containing the precomputed holdings and history dataframes.
+        :rtype: tuple[pd.DataFrame, pd.DataFrame]
+        """
+        current_holdings_kpis: pd.DataFrame = self.init_current_holdings_kpis()
+        history: pd.DataFrame = self.init_history(current_holdings_kpis)
+        
+        for _, current_holdings_kpis_, history_ in self.optimize(current_holdings_kpis, history):
+            current_holdings_kpis = current_holdings_kpis_
+            history = history_
+
+        return (
+            current_holdings_kpis,
+            history
         )
 
-        current_holdings_v_kpis = self.__remove_underperforming_instruments(current_holdings_v_kpis)
-        possible_replacements = self.__config.universe.instruments_sorted_by_kpi_for_date_snapshot(
-            by_which_kpi=KPIEnum.CAGR,
-            overall_start_date=self.__config.start_date,
-            snapshot_date=self.__config.end_date,
-            risk_free_rate_for_sharpe_and_sortino=self.__config.risk_free_rate,
+
+    # Private Methods
+    def __remove_underperforming_instruments(self, current_holdings_kpis: pd.DataFrame) -> pd.DataFrame:
+        """
+        Removes `number_of_replacements` underperforming instruments from the current holdings.
+
+        :param current_holdings_kpis: The current holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
+        :type current_holdings_kpis: pd.DataFrame
+
+        :return pd.DataFrame: The holdings with their KPIs as a pd.DataFrame, with `number_of_replacements` underperforming instruments removed
+        """
+        n: int = self._config.number_of_holdings - self._config.number_of_replacements
+        return current_holdings_kpis.nlargest(n, KPIEnum.CAGR.value)
+    
+
+    def __sync_current_holdings_kpis_to_latest(self, current_holdings_kpis: pd.DataFrame) -> pd.DataFrame:
+        """Update KPIs for current holdings as of the latest snapshot date."""
+        all_kpis = self._config.universe.sorted_kpi_snapshot(
+            sort_by=KPIEnum.CAGR,
+            overall_start_date=self._config.start_date,
+            snapshot_date=self._config.end_date,
+            rf_sharpe_sortino=self._config.risk_free_rate,
+            ascending=False
+        )
+        return all_kpis.loc[current_holdings_kpis.index]
+
+
+    def __get_possible_replacements(self) -> pd.DataFrame:
+        """Get all instruments sorted by KPI for the current snapshot date."""
+        return self._config.universe.sorted_kpi_snapshot(
+            sort_by=KPIEnum.CAGR,
+            overall_start_date=self._config.start_date,
+            snapshot_date=self._config.end_date,
+            rf_sharpe_sortino=self._config.risk_free_rate,
             ascending=False
         )
 
 
-        if self.__config.allow_repeated_replacements:
-            top_possible_replacements = possible_replacements.head(self.__config.number_of_replacements)
-            
-            common_holdings = current_holdings_v_kpis.index.intersection(top_possible_replacements.index)
-            new_holdings = top_possible_replacements.index.difference(current_holdings_v_kpis.index)
+    def __replace_with_repeats(self, retained_holdings: pd.DataFrame, possible_replacements: pd.DataFrame) -> pd.DataFrame:
+        """Replace underperformers, allowing repeated replacements."""
+        top_replacements = possible_replacements.head(self._config.number_of_replacements)
+        common = retained_holdings.index.intersection(top_replacements.index)
+        new = top_replacements.index.difference(retained_holdings.index)
 
-            if common_holdings.empty:
-                return pd.concat([current_holdings_v_kpis, top_possible_replacements], axis=0).sort_values(KPIEnum.CAGR.value, ascending=False)
-            
-            updated_holdings = current_holdings_v_kpis.copy()
-            updated_holdings.loc[common_holdings, InstrumentUniverse._Number_Of_Holdings_Column_Name] += top_possible_replacements.loc[common_holdings, InstrumentUniverse._Number_Of_Holdings_Column_Name]
-            
-            if new_holdings.empty:
-                return updated_holdings.sort_values(KPIEnum.CAGR.value, ascending=False)
-            
-            return (
-                pd.concat(
-                    [updated_holdings, top_possible_replacements.loc[new_holdings]],
-                    axis=0
-                )
-                .sort_values(
-                    KPIEnum.CAGR.value,
-                    ascending=False
-                )
-            )
+        updated = retained_holdings.copy()
+        
+        if not common.empty:
+            updated.loc[common, InstrumentUniverse._Number_Of_Holdings_Column_Name] += top_replacements.loc[common, InstrumentUniverse._Number_Of_Holdings_Column_Name]
+        
+        if not new.empty:
+            updated = pd.concat([updated, top_replacements.loc[new]], axis=0)
 
-        replacements = (
-            possible_replacements
-            .drop(axis=0, labels=current_holdings_v_kpis.index)
-            .head(self.__config.number_of_replacements)
-        )
-        return (
-            pd.concat(
-                [current_holdings_v_kpis, replacements],
-                axis=0
-            ).sort_values(
-                KPIEnum.CAGR.value,
-                ascending=False
-            )
-        )
+        return updated.sort_values(KPIEnum.CAGR.value, ascending=False)
 
-    @override
-    def precomputed_holdings_v_kpis(self, holdings_history: pd.DataFrame) -> pd.DataFrame:
-        """
-        Updates the current holdings with their KPIs as a DataFrame as per the default strategy.
 
-        :param holdings_history: The historical holdings with their KPIs as a DataFrame. Index is (date, symbol), and the columns are the KPI values.
-        :type holdings_history: pd.DataFrame
-
-        :return pd.DataFrame: The holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
-        """
-        return super().precomputed_holdings_v_kpis(holdings_history)
-    
-
-    @override
-    def precomputed_history(self) -> pd.DataFrame:
-        """
-        Precomputes the history of KPIs based on the rebalancing strategy.
-
-        :return pd.DataFrame: The precomputed history of the portfolio, sorted by CAGR. Multi-Index - (date, symbol), columns - KPIs.
-        """
-        return self.__config.universe.instrument_history_sorted_by_kpi_per_date_for_date_range(
-            by_which_kpi=KPIEnum.CAGR,
-            period_start_date=self.__config.start_date,
-            period_end_date=self.__config.end_date,
-            ascending=False,
-            risk_free_rate_for_sharpe_and_sortino=self.__config.risk_free_rate,
-            top_n=self.__config.number_of_holdings
-        )
-    
-
-    @override
-    def optimize(self, current_holdings_v_kpis: pd.DataFrame) -> tuple[pd.Timestamp, pd.DataFrame]:
-        """
-        Optimizes the portfolio based on the rebalancing strategy.
-
-        :param current_holdings_v_kpis: The current holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
-        :type current_holdings_v_kpis: pd.DataFrame
-
-        :return tuple[pd.Timestamp, pd.DataFrame]: A tuple with the last optimized date and a DataFrame of the optimized holdings and their KPIs as of that date.
-        """
-        try:
-            end_date = DataFrameDateIndexHelper.next_date(
-                df_with_datetime_index=self.__config.universe.closes_df,
-                date=self.__config.end_date
-            )
-        except IndexError:
-            print("[WARNING] There are no more dates available in the universe to optimize the portfolio. Skipping optimization.")
-            return self.__config.end_date, self.update_holdings_v_kpis(current_holdings_v_kpis)
-
-        self.__config.end_date = end_date
-        return self.__config.end_date, self.update_holdings_v_kpis(current_holdings_v_kpis)
-    
-
-    # Private Methods
-    def __remove_underperforming_instruments(self, current_holdings_v_kpis: pd.DataFrame) -> pd.DataFrame:
-        """
-        Removes `number_of_replacements` underperforming instruments from the current holdings.
-
-        :param current_holdings_v_kpis: The current holdings with their KPIs as a DataFrame. Index is the instrument symbol, and the columns are the KPI values.
-        :type current_holdings_v_kpis: pd.DataFrame
-
-        :return pd.DataFrame: The holdings with their KPIs as a pd.DataFrame, with `number_of_replacements` underperforming instruments removed
-        """
-        n: int = self.__config.number_of_holdings - self.__config.number_of_replacements
-        return current_holdings_v_kpis.nlargest(n, KPIEnum.CAGR.value)
+    def __replace_without_repeats(self, retained_holdings: pd.DataFrame, possible_replacements: pd.DataFrame) -> pd.DataFrame:
+        """Replace underperformers, not allowing repeated replacements."""
+        replacements = possible_replacements.drop(axis=0, labels=retained_holdings.index).head(self._config.number_of_replacements)
+        return pd.concat([retained_holdings, replacements], axis=0).sort_values(KPIEnum.CAGR.value, ascending=False)

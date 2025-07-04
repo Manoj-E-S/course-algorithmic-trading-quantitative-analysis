@@ -55,8 +55,8 @@ class RollingKPICalculator:
         if end_date is None:
             end_date = prices_df.index.max()
 
-        self.__start_date: pd.Timestamp = DataFrameDateIndexHelper.get_nearest_date(prices_df, start_date)
-        self.__end_date: pd.Timestamp = DataFrameDateIndexHelper.get_nearest_date(prices_df, end_date)
+        self.__start_date: pd.Timestamp = DataFrameDateIndexHelper.get_nearest_date(prices_df.index, start_date)
+        self.__end_date: pd.Timestamp = DataFrameDateIndexHelper.get_nearest_date(prices_df.index, end_date)
 
         if row_span.value not in CandlespanEnum.values():
             raise ValueError(f"Unsupported row_span. Supported row spans are: {CandlespanEnum.values()}")
@@ -242,7 +242,7 @@ class RollingKPICalculator:
         volatility_df = pd.DataFrame(index=returns_df.index, columns=returns_df.columns, dtype=float)
         for date in returns_df.index:
             start_date_idx, current_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-                df_with_datetime_index=returns_df,
+                datetime_index=returns_df.index,
                 from_date=self.__start_date,
                 until_date=date
             )
@@ -265,7 +265,7 @@ class RollingKPICalculator:
         :rtype: pd.DataFrame
         """
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df_with_datetime_index=self.__prices_df,
+            datetime_index=self.__prices_df.index,
             from_date=self.__start_date,
             until_date=self.__end_date
         )

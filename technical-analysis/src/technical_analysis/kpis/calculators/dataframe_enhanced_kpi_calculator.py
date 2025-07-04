@@ -44,12 +44,12 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
             return 0.0
 
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df_with_datetime_index=ohlcv_df,
+            datetime_index=ohlcv_df.index,
             from_date=from_date,
             until_date=until_date
         )
 
-        periods: float = DataFrameDateIndexHelper.get_years_between_date_indices(ohlcv_df, start_date_idx, end_date_idx)
+        periods: float = DataFrameDateIndexHelper.get_years_between_date_indices(ohlcv_df.index, start_date_idx, end_date_idx)
         if periods <= 0:
             return 0.0
         
@@ -84,7 +84,7 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
             return 0.0
 
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df_with_datetime_index=cumulative_returns.to_frame(),
+            datetime_index=cumulative_returns.to_frame().index,
             from_date=from_date,
             until_date=until_date
         )
@@ -124,7 +124,7 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
         :rtype: float
         """
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df_with_datetime_index=returns_series.to_frame(),
+            datetime_index=returns_series.to_frame().index,
             from_date=from_date,
             until_date=until_date
         )

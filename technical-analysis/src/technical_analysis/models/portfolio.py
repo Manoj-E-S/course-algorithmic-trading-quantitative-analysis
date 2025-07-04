@@ -1,5 +1,7 @@
 from dataclasses import asdict
 from datetime import datetime
+from itertools import islice
+from typing import Generator
 
 import numpy as np
 import pandas as pd
@@ -10,8 +12,9 @@ from technical_analysis.enums.portfolio_optimization_strategy import PortfolioOp
 from technical_analysis.mappers.aggfn_to_name import AggFnToName
 from technical_analysis.mappers.kpi_to_aggfn import KPIToAggFn
 from technical_analysis.models.instrument_universe import InstrumentUniverse
-from technical_analysis.portfolio_optimizers.base import BaseOptimizer, DefaultOptimizerConfig
+from technical_analysis.portfolio_optimizers.top_picks import TopPicksOptimizer, OptimizerConfig
 from technical_analysis.utils.dataframe_date_helper import DataFrameDateIndexHelper
+from technical_analysis.utils.decorators import mutually_exclusive_args
 
 
 class Portfolio:
@@ -26,11 +29,11 @@ class Portfolio:
         enable_precomputed_mode: bool = False,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        optimization_strategy: PortfolioOptimizationStrategy = PortfolioOptimizationStrategy.DEFAULT,
-        optimizer_config: DefaultOptimizerConfig | None = None
+        optimization_strategy: PortfolioOptimizationStrategy = PortfolioOptimizationStrategy.TOP_PICKS,
+        optimizer_config: OptimizerConfig | None = None
     ):
         if optimizer_config is None:
-            optimizer_config = DefaultOptimizerConfig()
+            optimizer_config = OptimizerConfig()
 
         if not enable_precomputed_mode and end_date is not None:
             raise ValueError("In incremental mode, end date is meaningless. Either do not provide this parameter, or create a new portfolio in precomputed mode.")
@@ -39,7 +42,7 @@ class Portfolio:
         self.__number_of_holdings: int = number_of_holdings
 
         self.__precomputed: bool = enable_precomputed_mode
-        self.__unset_precomputation_done_()
+        self.__precomputation_not_done()
 
         self.__init_start_and_end_dates(
             start_date=start_date,
@@ -47,9 +50,9 @@ class Portfolio:
         )
 
         self.__optimization_strategy: PortfolioOptimizationStrategy = optimization_strategy
-        self.__optimizer_config: DefaultOptimizerConfig = optimizer_config
+        self.__optimizer_config: OptimizerConfig = optimizer_config
 
-        self.__optimizer: BaseOptimizer = self.__get_optimizer()
+        self.__optimizer: TopPicksOptimizer = self.__get_optimizer()
         self.__setup_data()
         self.__setup_metadata()
 
@@ -60,7 +63,7 @@ class Portfolio:
         return self.__optimization_strategy
 
     @property
-    def optimizer_config(self) -> DefaultOptimizerConfig:
+    def optimizer_config(self) -> OptimizerConfig:
         return self.__optimizer_config
 
     @property
@@ -81,11 +84,13 @@ class Portfolio:
 
     @property
     def current_holdings(self) -> pd.DataFrame:
-        return self.__holdings_v_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name].to_frame()
+        self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name] = self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name].astype('int32')
+        return self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name].to_frame()
 
     @property
-    def current_holdings_v_kpis(self) -> pd.DataFrame:
-        return self.__holdings_v_kpis
+    def current_holdings_kpis(self) -> pd.DataFrame:
+        self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name] = self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name].astype('int32')
+        return self.__current_holdings_kpis
     
     @property
     def holding_history(self) -> pd.DataFrame:
@@ -112,7 +117,7 @@ class Portfolio:
     def portfolio_kpis(self) -> pd.DataFrame:
         rows = []
         for kpi, agg_fn in KPIToAggFn.Mapper.items():
-            series: pd.Series = self.__holdings_v_kpis[kpi.value]
+            series: pd.Series = self.__current_holdings_kpis[kpi.value]
 
             agg_val: float = agg_fn(series)
             agg_method: str = AggFnToName.Mapper.get(agg_fn, "UNKNOWN")
@@ -145,7 +150,7 @@ class Portfolio:
             raise ValueError("This portfolio is in incremental mode. Cannot change start date. Create a new portfolio in precomputed mode instead.")
 
         if self.__start_date != start_date:
-            start_date = self.__available_dates(
+            start_date = self.__universe.get_all_available_dates(
                 start_date=None if start_date is None else pd.Timestamp(start_date),
                 end_date=self.__end_date
             )[0]
@@ -160,7 +165,7 @@ class Portfolio:
             raise ValueError("This portfolio is in incremental mode. Cannot change end date. Create a new portfolio in precomputed mode instead.")
 
         if self.__end_date != end_date:
-            end_date = self.__available_dates(
+            end_date = self.__universe.get_all_available_dates(
                 start_date=self.__start_date,
                 end_date=None if end_date is None else pd.Timestamp(end_date)
             )[-1]
@@ -170,7 +175,7 @@ class Portfolio:
     
 
     # Public methods
-    def change_optimizer(self, optimization_strategy: PortfolioOptimizationStrategy, optimizer_config: DefaultOptimizerConfig) -> 'Portfolio':
+    def change_optimizer(self, optimization_strategy: PortfolioOptimizationStrategy, optimizer_config: OptimizerConfig) -> 'Portfolio':
         if self.__optimization_strategy != optimization_strategy:
             self.__optimization_strategy = optimization_strategy
             self.__optimizer_config = optimizer_config
@@ -179,20 +184,110 @@ class Portfolio:
         return self
     
 
-    def optimize(self) -> 'Portfolio':
+    def step_to(self, date: datetime) -> 'Portfolio':
         """
-        Optimizes the portfolio for the next date.
+        Moves the portfolio to the specified date. If the date is before the start date, it will move to the start date.
+        If the date is after the end date, it will move to the end date.
+
+        :param date: The date to step to.
+        :type date: datetime
 
         :return: The optimized portfolio instance.
         
         :raises ValueError: If the portfolio is in precomputed mode.
         """
         if self.in_precomputed_mode:
-            raise ValueError("This portfolio is in precomputed mode. Cannot optimize a portfolio in precomputed mode. Create a new portfolio in incremental mode instead.")
+            raise ValueError("This portfolio is in precomputed mode. It is already optimized fully. Create a new portfolio in incremental mode instead.")
 
-        self.__end_date, self.__holdings_v_kpis = self.__optimizer.optimize(self.__holdings_v_kpis)
-        self.__insert_into_incremental_history(self.__holdings_v_kpis)
-        self.__update_metadata()
+        possible_dates: pd.DatetimeIndex = self.__universe.get_all_available_dates(start_date=self.__start_date)
+        
+        date = pd.Timestamp(date)
+        if date < possible_dates[0]:
+            date = possible_dates[0]
+        elif date > possible_dates[-1]:
+            date = possible_dates[-1]
+        else:
+            date = DataFrameDateIndexHelper.get_nearest_date(
+                datetime_index=possible_dates,
+                date=date
+            )
+
+        if date > self.__end_date:
+            # Find number of periods from the current end date to the target date
+            curr_end_idx, target_end_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
+                datetime_index=possible_dates,
+                from_date=self.__end_date,
+                until_date=date
+            )
+            num_periods: int = target_end_idx - curr_end_idx
+            # step_up portfolio upto the specified date
+            return self.step_up(num_periods)
+        
+        if date < self.__end_date:
+            # Find number of periods from the target date to the current end date
+            target_end_idx, curr_end_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
+                datetime_index=possible_dates,
+                from_date=date,
+                until_date=self.__end_date
+            )
+            num_periods: int = curr_end_idx - target_end_idx
+            # step_back portfolio upto the specified date
+            return self.step_back(num_periods)
+        
+        # If the date is the same as the current end date, do nothing
+        return self
+
+
+    def step_back(self, num_periods: int = 1) -> 'Portfolio':
+        """
+        Moves the portfolio back by `num_periods` periods.
+        If `num_periods` is greater than the number of available periods, it will step back to the first available date.
+
+        :param num_periods: The number of periods to step back. Default is 1.
+        :type num_periods: int
+
+        :return: The portfolio instance.
+        
+        :raises ValueError: If the portfolio is in precomputed mode.
+        """
+        if self.in_precomputed_mode:
+            raise ValueError("This portfolio is in precomputed mode. It is already optimized fully. Create a new portfolio in incremental mode instead.")
+
+        if len(self.date_range) <= 1:
+            return self
+
+        if num_periods > len(self.date_range) - 1:
+            num_periods = len(self.date_range) - 1
+
+        dates_to_be_dropped = self.date_range[-num_periods:]
+        self.__history.drop(index=dates_to_be_dropped, level='date', inplace=True)
+        self.__metadata.drop(index=dates_to_be_dropped, inplace=True)
+        self.__current_holdings_kpis = self.__history.loc[self.date_range[-1], :]
+
+        return self
+
+
+    def step_up(self, num_periods: int = 1) -> 'Portfolio':
+        """
+        Moves the portfolio ahead by `num_periods` periods.
+        If `num_periods` is greater than the number of available periods, it will step up to the last available date.
+
+        :param num_periods: The number of periods to step up. Default is 1.
+        :type num_periods: int
+
+        :return: The portfolio instance.
+        
+        :raises ValueError: If the portfolio is in precomputed mode.
+        """
+        if self.in_precomputed_mode:
+            raise ValueError("This portfolio is in precomputed mode. It is already optimized fully. Create a new portfolio in incremental mode instead.")
+
+        optimization_gen: Generator[tuple[pd.Timestamp, pd.DataFrame, pd.DataFrame], None, None]\
+            = self.__optimizer.optimize(self.__current_holdings_kpis, self.__history)
+        
+        for result in islice(optimization_gen, num_periods):
+            self.__end_date, self.__current_holdings_kpis, self.__history = result
+            self.__update_metadata()
 
         return self
     
@@ -203,9 +298,9 @@ class Portfolio:
         start_date: datetime | None = None,
         end_date: datetime | None = None
     ) -> None:
-        available_dates: pd.DatetimeIndex = self.__available_dates(
-            start_date=None if start_date is None else pd.Timestamp(start_date),
-            end_date=None if end_date is None else pd.Timestamp(end_date)
+        available_dates = self.__universe.get_all_available_dates(
+            start_date=pd.Timestamp(start_date) if start_date else None,
+            end_date=pd.Timestamp(end_date) if end_date else None
         )
 
         if self.in_precomputed_mode:
@@ -215,35 +310,8 @@ class Portfolio:
             self.__start_date: pd.Timestamp = available_dates[0]
             self.__end_date: pd.Timestamp = self.__start_date
 
-    
-    def __available_dates(
-        self,
-        start_date: pd.Timestamp | None = None,
-        end_date: pd.Timestamp | None = None
-    ) -> pd.DatetimeIndex:
-        """
-        Returns a DatetimeIndex of available dates in the universe.
 
-        :param start_date: The start date of the range. If None, uses the earliest date.
-        :type start_date: pd.Timestamp
-
-        :param end_date: The end date of the range. If None, uses the latest date.
-        :type end_date: pd.Timestamp
-
-        :returns pd.DatetimeIndex: A DatetimeIndex of available dates.
-        """
-        full_datetime_index: pd.DatetimeIndex = self.__universe.closes_df.index
-
-        start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            df_with_datetime_index=pd.DataFrame(index=full_datetime_index),
-            from_date=start_date,
-            until_date=end_date
-        )
-
-        return full_datetime_index[start_date_idx:end_date_idx + 1].sort_values()
-
-
-    def __get_optimizer(self) -> BaseOptimizer:
+    def __get_optimizer(self) -> TopPicksOptimizer:
         """
         Returns the appropriate optimizer based on the optimization strategy, and initializes it with the provided configuration.
         """
@@ -254,46 +322,10 @@ class Portfolio:
                 number_of_holdings=self.__number_of_holdings,
                 start_date=self.__start_date,
                 end_date=self.__end_date,
+                in_precomputed_mode=self.in_precomputed_mode,
                 **asdict(self.__optimizer_config),
             )
         )
-    
-
-    def __init_incremental_history(self, holdings_v_kpis: pd.DataFrame) -> None:
-        """
-        Initializes the history DataFrame for the portfolio.
-        """
-        if self.in_precomputed_mode:
-            raise ValueError("This portfolio is in precomputed mode. Cannot initialize via current holdings. Create a new portfolio in incremental mode instead.")
-        
-        self.__history: pd.DataFrame = \
-            pd.DataFrame(
-                data=holdings_v_kpis.values,
-                index=pd.MultiIndex.from_product(
-                    [[self.__end_date], holdings_v_kpis.index],
-                    names=['date', 'symbol']
-                ),
-                columns=holdings_v_kpis.columns
-            )
-
-
-    def __insert_into_incremental_history(self, holdings_v_kpis: pd.DataFrame) -> None:
-        """
-        Inserts the current holdings with KPIs into the history DataFrame.
-        """
-        if self.in_precomputed_mode:
-            raise ValueError("This portfolio is in precomputed mode. Cannot insert into history. Create a new portfolio in incremental mode instead.")
-
-        holdings_v_kpis_with_date = holdings_v_kpis.copy()
-        holdings_v_kpis_with_date.index = pd.MultiIndex.from_product(
-            [[self.__end_date], holdings_v_kpis_with_date.index],
-            names=["date", "symbol"]
-        )
-
-        if self.__end_date in self.__history.index.get_level_values("date"):
-            self.__history.drop(index=self.__end_date, level="date", inplace=True)
-
-        self.__history = pd.concat([self.__history, holdings_v_kpis_with_date])
     
 
     def __setup_data(self) -> None:
@@ -303,11 +335,11 @@ class Portfolio:
         if self.in_precomputed_mode:
             self.__precompute_data()
             return
+        
+        self.__current_holdings_kpis: pd.DataFrame = self.__optimizer.init_current_holdings_kpis()
+        self.__history: pd.DataFrame = self.__optimizer.init_history(self.__current_holdings_kpis)
 
-        self.__holdings_v_kpis = self.__optimizer.init_holdings_v_kpis()
-        self.__init_incremental_history(self.__holdings_v_kpis)
 
-    
     def __sync_data(self) -> None:
         """
         Syncs the data for the portfolio by updating holdings with KPIs and the holding history.
@@ -316,8 +348,8 @@ class Portfolio:
             self.__precompute_data()
             return
         
-        self.__holdings_v_kpis = self.__optimizer.update_holdings_v_kpis(self.__holdings_v_kpis)
-        self.__insert_into_incremental_history(self.__holdings_v_kpis)
+        self.__current_holdings_kpis = self.__optimizer.update_current_holdings_kpis(self.__current_holdings_kpis)
+        self.__history = self.__optimizer.append_to_history(self.__history, self.__current_holdings_kpis)
 
     
     def __precompute_data(self) -> None:
@@ -330,9 +362,8 @@ class Portfolio:
         if self.__precomputation_done_:
             return
         
-        self.__history = self.__optimizer.precomputed_history()
-        self.__holdings_v_kpis = self.__optimizer.precomputed_holdings_v_kpis(self.__history)
-        self.__set_precomputation_done_()
+        self.__current_holdings_kpis, self.__history = self.__optimizer.precompute()
+        self.__precomputation_done()
 
     
     def __setup_metadata(self) -> None:
@@ -358,7 +389,7 @@ class Portfolio:
         Updates the current metadata into the metadata DataFrame for the portfolio.
         """
         if self.in_precomputed_mode:
-            raise ValueError("This portfolio is in precomputed mode. Cannot insert into metadata. Create a new portfolio in incremental mode instead.")
+            raise ValueError("This portfolio is in precomputed mode. Cannot update metadata. Create a new portfolio in incremental mode instead.")
         
         if self.__end_date in self.__metadata.index:
             self.__metadata.drop(index=self.__end_date, inplace=True)
@@ -374,14 +405,14 @@ class Portfolio:
         """
         Called after a property update to refresh the holdings and history.
         """
-        self.__unset_precomputation_done_()
+        self.__precomputation_not_done()
         self.__optimizer = self.__get_optimizer()
         self.__sync_data()
         self.__update_metadata()
         return self
 
 
-    def __set_precomputation_done_(self) -> None:
+    def __precomputation_done(self) -> None:
         if self.in_incremental_mode:
             self.__precomputation_done_ = None
             return
@@ -389,7 +420,7 @@ class Portfolio:
         self.__precomputation_done_ = True
 
 
-    def __unset_precomputation_done_(self) -> None:
+    def __precomputation_not_done(self) -> None:
         if self.in_incremental_mode:
             self.__precomputation_done_ = None
             return

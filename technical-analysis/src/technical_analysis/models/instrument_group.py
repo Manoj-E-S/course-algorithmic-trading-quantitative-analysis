@@ -10,6 +10,7 @@ from technical_analysis.models.candlesticks import Candlesticks
 from technical_analysis.models.instrument import Instrument
 from technical_analysis.models.renko import Renko
 from technical_analysis.providers.data_view import DataViewProvider
+from technical_analysis.utils.dataframe_date_helper import DataFrameDateIndexHelper
 from technical_analysis.utils.decorators import mutually_exclusive_args, optionally_overridable
 
 
@@ -17,10 +18,6 @@ class InstrumentGroup:
     """
     A class to get all dataframes useful for financial analyses
     """
-    # Type Aliases
-    _AllowedSimpleMovingOperationsType = Literal['mean', 'var', 'std', 'corr', 'cov', 'min', 'max']
-    _AllowedExponentialMovingOperationsType = Literal['mean', 'var', 'std', 'corr', 'cov']
-    _AvailableDataFramesType = Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change']
 
     def __init__(
         self,
@@ -113,6 +110,33 @@ class InstrumentGroup:
         Returns a DataFrame with dates as index, instrument symbols as columns and cumulative volume change as the cell-data
         """
         return self._views.instrument_group_cumulative_change_in_metric_view(OHLCVUDEnum.VOLUME, self._candle_span, self._instrument_symbols)
+    
+
+    def get_all_available_dates(
+        self,
+        start_date: pd.Timestamp | None = None,
+        end_date: pd.Timestamp | None = None
+    ) -> pd.DatetimeIndex:
+        """
+        Returns a DatetimeIndex of available dates between said start and end dates.
+
+        :param start_date: The start date of the range. If None, uses the earliest date.
+        :type start_date: pd.Timestamp
+
+        :param end_date: The end date of the range. If None, uses the latest date.
+        :type end_date: pd.Timestamp
+
+        :returns pd.DatetimeIndex: A DatetimeIndex of all available dates.
+        """
+        full_datetime_index: pd.DatetimeIndex = self.closes_df.index
+
+        start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
+            datetime_index=full_datetime_index,
+            from_date=start_date,
+            until_date=end_date
+        )
+
+        return full_datetime_index[start_date_idx:end_date_idx + 1].sort_values()
 
 
     # Public Methods
@@ -189,8 +213,8 @@ class InstrumentGroup:
 
     def apply_simple_moving_operation(
         self,
-        on_which_data: _AvailableDataFramesType,
-        which_operation: _AllowedSimpleMovingOperationsType,
+        on_which_data: Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change'],
+        which_operation: Literal['mean', 'var', 'std', 'corr', 'cov', 'min', 'max'],
         window: int
     ) -> pd.DataFrame:
         
@@ -204,8 +228,8 @@ class InstrumentGroup:
 
     def apply_exponential_moving_operation(
         self,
-        on_which_data: _AvailableDataFramesType,
-        which_operation: _AllowedExponentialMovingOperationsType, 
+        on_which_data: Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change'],
+        which_operation: Literal['mean', 'var', 'std', 'corr', 'cov'], 
         window: int,
         min_periods: int = 0,
     ) -> pd.DataFrame:
@@ -240,7 +264,7 @@ class InstrumentGroup:
     @optionally_overridable
     def _resolve_df(
         self,
-        df_name: _AvailableDataFramesType
+        df_name: Literal['closes', 'returns', 'cumulative_returns', 'volume', 'volume_change', 'cumulative_volume_change']
     ) -> pd.DataFrame:
         """
         Resolves the DataFrame based on the provided DataFrame name.
