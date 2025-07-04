@@ -111,17 +111,21 @@ class RollingKPICalculator:
     # Cached properties
     @cached_property
     def __cached_cumulative_cagrs(self) -> pd.DataFrame:
-        cumulative_years_series: pd.Series = (self.__date_bound_prices_df().index - self.__start_date).days / 252  # trading years
-        years = cumulative_years_series.values.reshape(-1, 1)
+        prices_df: pd.DataFrame = self.__date_bound_prices_df()
+        periods_per_year: int = CandlespanEnum.periods_per_year(self.__row_span)
         
-        # Replace years <= 0 with np.nan to avoid division by zero
-        safe_years = np.where(years <= 0, np.nan, years)
+        cumulative_years_series = pd.Series(
+            data=(np.arange(0, len(prices_df)) / periods_per_year),
+            index=prices_df.index
+        )
+        cumulative_years: np.ndarray = cumulative_years_series.values.reshape(-1, 1)        # Reshape to ensure it is column vector for broadcasting
+        safe_years: np.ndarray = np.where(cumulative_years <= 0, np.nan, cumulative_years)  # Replace cumulative_years <= 0 with np.nan to avoid division by zero
 
-        start_prices: pd.Series = pd.Series(self.__date_bound_prices_df().loc[self.__start_date])
-        cumulative_cagrs_df = \
-            self.__date_bound_prices_df().div(start_prices).pow(1 / safe_years) - 1
+        start_prices: pd.Series = pd.Series(prices_df.loc[self.__start_date])               # Get the prices at the start date for each instrument
+
+        cumulative_cagrs_df = prices_df.div(start_prices).pow(1 / safe_years) - 1
         return cumulative_cagrs_df
-    
+
 
     @cached_property
     def __cached_cumulative_max_drawdowns(self) -> pd.DataFrame:
@@ -249,12 +253,8 @@ class RollingKPICalculator:
             volatility_df.loc[date] = KPICalculator.non_annualized_volatility(returns_df.iloc[start_date_idx:current_date_idx + 1], downside=downside)
 
         # Convert non-annualized volatility to annualized volatility based on the row span
-        if self.row_span == CandlespanEnum.DAILY:
-            return volatility_df * np.sqrt(252)
-        elif self.row_span == CandlespanEnum.WEEKLY:
-            return volatility_df * np.sqrt(52)
-        elif self.row_span == CandlespanEnum.MONTHLY:
-            return volatility_df * np.sqrt(12)
+        multiplier: float = np.sqrt(CandlespanEnum.periods_per_year(self.__row_span))
+        return volatility_df * multiplier
         
 
     def __date_bound_prices_df(self) -> pd.DataFrame:

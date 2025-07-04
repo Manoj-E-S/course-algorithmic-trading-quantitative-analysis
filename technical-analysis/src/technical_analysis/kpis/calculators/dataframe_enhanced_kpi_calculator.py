@@ -20,6 +20,7 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
     @staticmethod
     def cagr_from_df(
         ohlcv_df: pd.DataFrame,
+        row_span: CandlespanEnum,
         from_date: pd.Timestamp | None = None,
         until_date: pd.Timestamp | None = None
     ) -> float:
@@ -29,8 +30,8 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
         :param ohlcv_df: The OHLCV DataFrame containing the instrument data.
         :type ohlcv_df: pd.DataFrame
 
-        :param candle_span: The candle span of the instrument (e.g., daily, weekly, monthly).
-        :type candle_span: CandlespanEnum
+        :param row_span: The candle span of the instrument (e.g., daily, weekly, monthly).
+        :type row_span: CandlespanEnum
 
         :param from_date: The date from which to calculate the CAGR. If None, uses the earliest date.
         :type from_date: pd.Timestamp | None
@@ -49,7 +50,7 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
             until_date=until_date
         )
 
-        periods: float = DataFrameDateIndexHelper.get_years_between_date_indices(ohlcv_df.index, start_date_idx, end_date_idx)
+        periods: float = DataFrameDateIndexHelper.get_years_between_date_indices(ohlcv_df.index, row_span, start_date_idx, end_date_idx)
         if periods <= 0:
             return 0.0
         
@@ -124,7 +125,7 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
         :rtype: float
         """
         start_date_idx, end_date_idx = DataFrameDateIndexHelper.resolve_date_range_to_idx_range(
-            datetime_index=returns_series.to_frame().index,
+            datetime_index=returns_series.index,
             from_date=from_date,
             until_date=until_date
         )
@@ -136,12 +137,5 @@ class DataFrameEnhancedKPICalculator(KPICalculator):
         
         volatility = KPICalculator.non_annualized_volatility(returns_series, downside=downside)
         
-        if row_span == CandlespanEnum.DAILY:
-            return volatility * np.sqrt(252)
-        elif row_span == CandlespanEnum.WEEKLY:
-            return volatility * np.sqrt(52)
-        elif row_span == CandlespanEnum.MONTHLY:
-            return volatility * np.sqrt(12)
-        else:
-            err: str = f"Unsupported row span. Supported row spans are: {CandlespanEnum.values()}"
-            raise ValueError(err)
+        multiplier: float = np.sqrt(CandlespanEnum.periods_per_year(row_span))
+        return volatility * multiplier

@@ -1,4 +1,5 @@
 import pandas as pd
+from technical_analysis.enums.candlespan import CandlespanEnum
 
 
 class DataFrameDateIndexHelper:
@@ -13,6 +14,7 @@ class DataFrameDateIndexHelper:
     @staticmethod
     def get_years_between_date_indices(
         datetime_index: pd.DatetimeIndex,
+        row_span: CandlespanEnum,
         start_date_idx: int = 0,
         end_date_idx: int = -1
     ) -> float:
@@ -22,8 +24,8 @@ class DataFrameDateIndexHelper:
         :param datetime_index: The DatetimeIndex of the dataframe containing the instrument data.
         :type datetime_index: pd.DatetimeIndex
 
-        :param candle_span: The candle span of the instrument (e.g., daily, weekly, monthly).
-        :type candle_span: CandlespanEnum
+        :param row_span: The candle span of the instrument (e.g., daily, weekly, monthly).
+        :type row_span: CandlespanEnum
         
         :param start_date_idx: The index of the start date in the DataFrame. Default is 0.
         :type start_date_idx: int
@@ -43,7 +45,9 @@ class DataFrameDateIndexHelper:
         if start_date == end_date:
             return 0.0
 
-        return (end_date - start_date).days / 252
+        periods_per_year: int = CandlespanEnum.periods_per_year(row_span)
+        
+        return len(datetime_index[start_date_idx:end_date_idx + 1]) / periods_per_year
 
 
     @staticmethod

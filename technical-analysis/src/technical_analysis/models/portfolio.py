@@ -1,5 +1,6 @@
 from dataclasses import asdict
 from datetime import datetime
+from functools import cached_property
 from itertools import islice
 from typing import Generator
 
@@ -14,7 +15,6 @@ from technical_analysis.mappers.kpi_to_aggfn import KPIToAggFn
 from technical_analysis.models.instrument_universe import InstrumentUniverse
 from technical_analysis.portfolio_optimizers.top_picks import TopPicksOptimizer, OptimizerConfig
 from technical_analysis.utils.dataframe_date_helper import DataFrameDateIndexHelper
-from technical_analysis.utils.decorators import mutually_exclusive_args
 
 
 class Portfolio:
@@ -113,7 +113,7 @@ class Portfolio:
     def in_incremental_mode(self) -> bool:
         return not self.__precomputed
     
-    @property
+    @cached_property
     def portfolio_kpis(self) -> pd.DataFrame:
         rows = []
         for kpi, agg_fn in KPIToAggFn.Mapper.items():
@@ -133,6 +133,30 @@ class Portfolio:
         portfolio_kpis_df = pd.DataFrame(data=rows, index=KPIEnum.values())
         portfolio_kpis_df.index.name = "kpi"
         return portfolio_kpis_df
+
+
+    @cached_property
+    def returns_series(self) -> pd.Series:
+        """
+        Returns the returns Series for the portfolio.
+
+        :return: The returns Series.
+        :rtype: pd.Series
+        """
+        current_holdings_returns_df: pd.DataFrame = self.__universe.closes_df[self.__current_holdings_kpis.index].loc[self.date_range].pct_change().fillna(0)
+        weights: pd.Series = self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name]
+        return current_holdings_returns_df.mul(weights, axis=1).sum(axis=1).div(weights.sum(), axis=0)
+    
+
+    @cached_property
+    def cumulative_returns_series(self) -> pd.Series:
+        """
+        Returns the cumulative returns Series for the portfolio.
+
+        :return: The cumulative returns Series.
+        :rtype: pd.Series
+        """
+        return (1 + self.returns_series).cumprod()
 
 
     # Chainable Setters
@@ -264,6 +288,7 @@ class Portfolio:
         self.__metadata.drop(index=dates_to_be_dropped, inplace=True)
         self.__current_holdings_kpis = self.__history.loc[self.date_range[-1], :]
 
+        self.__reset_cached_properties()
         return self
 
 
@@ -289,6 +314,7 @@ class Portfolio:
             self.__end_date, self.__current_holdings_kpis, self.__history = result
             self.__update_metadata()
 
+        self.__reset_cached_properties()
         return self
     
 
@@ -338,6 +364,7 @@ class Portfolio:
         
         self.__current_holdings_kpis: pd.DataFrame = self.__optimizer.init_current_holdings_kpis()
         self.__history: pd.DataFrame = self.__optimizer.init_history(self.__current_holdings_kpis)
+        self.__reset_cached_properties()
 
 
     def __sync_data(self) -> None:
@@ -350,6 +377,7 @@ class Portfolio:
         
         self.__current_holdings_kpis = self.__optimizer.update_current_holdings_kpis(self.__current_holdings_kpis)
         self.__history = self.__optimizer.append_to_history(self.__history, self.__current_holdings_kpis)
+        self.__reset_cached_properties()
 
     
     def __precompute_data(self) -> None:
@@ -363,6 +391,7 @@ class Portfolio:
             return
         
         self.__current_holdings_kpis, self.__history = self.__optimizer.precompute()
+        self.__reset_cached_properties()
         self.__precomputation_done()
 
     
@@ -399,17 +428,6 @@ class Portfolio:
             self.__number_of_holdings,
             self.__optimizer.config.risk_free_rate
         ]
-
-    
-    def __after_property_update(self) -> 'Portfolio':
-        """
-        Called after a property update to refresh the holdings and history.
-        """
-        self.__precomputation_not_done()
-        self.__optimizer = self.__get_optimizer()
-        self.__sync_data()
-        self.__update_metadata()
-        return self
 
 
     def __precomputation_done(self) -> None:
@@ -452,3 +470,24 @@ class Portfolio:
             return series.idxmax() if not series.empty else "N/A"
 
         return "N/A"
+    
+
+    def __after_property_update(self) -> 'Portfolio':
+        """
+        Called after a property update to refresh the holdings and history.
+        """
+        self.__precomputation_not_done()
+        self.__optimizer = self.__get_optimizer()
+        self.__sync_data()
+        self.__update_metadata()
+        self.__reset_cached_properties()
+        return self
+    
+
+    def __reset_cached_properties(self) -> None:
+        """
+        Resets the cached properties of the portfolio.
+        """
+        self.__dict__.pop('returns_series', None)
+        self.__dict__.pop('cumulative_returns_series', None)
+        self.__dict__.pop('portfolio_kpis', None)

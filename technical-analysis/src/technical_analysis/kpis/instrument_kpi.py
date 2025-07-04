@@ -40,6 +40,7 @@ class InstrumentKPI:
     def cached_CAGR(self) -> float:
         return DataFrameEnhancedKPICalculator.cagr_from_df(
             self.__instrument.ohlcv_df,
+            row_span=self.__instrument.candle_span,
             from_date=None,
             until_date=None
         )
@@ -80,6 +81,7 @@ class InstrumentKPI:
 
         return DataFrameEnhancedKPICalculator.cagr_from_df(
             self.__instrument.ohlcv_df,
+            row_span=self.__instrument.candle_span,
             from_date=from_date,
             until_date=until_date
         )
