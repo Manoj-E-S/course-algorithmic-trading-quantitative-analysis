@@ -620,8 +620,8 @@ def main():
         number_of_holdings=10,
         source_universe=nifty_50_universe,
         enable_precomputed_mode=True,
-        start_date=datetime(2014, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        end_date=datetime(2017, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        start_date=datetime(2011, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        end_date=datetime(2019, 10, 1, 0, 0, 0, 0, tzinfo=None),
         optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
         optimizer_config=RebalancingOptimizerConfig(
             number_of_replacements=3,
