@@ -19,7 +19,7 @@ class CandlespanToOhlcvKeys:
             OHLCVUDEnum.OPEN: "1. open",
             OHLCVUDEnum.HIGH: "2. high",
             OHLCVUDEnum.LOW: "3. low",
-            OHLCVUDEnum.CLOSE: "4. close",
+            OHLCVUDEnum.CLOSE: "5. adjusted close",
             OHLCVUDEnum.VOLUME: "6. volume",
         },
         
@@ -27,7 +27,7 @@ class CandlespanToOhlcvKeys:
             OHLCVUDEnum.OPEN: "1. open",
             OHLCVUDEnum.HIGH: "2. high",
             OHLCVUDEnum.LOW: "3. low",
-            OHLCVUDEnum.CLOSE: "4. close",
+            OHLCVUDEnum.CLOSE: "5. adjusted close",
             OHLCVUDEnum.VOLUME: "6. volume",
         }
     }

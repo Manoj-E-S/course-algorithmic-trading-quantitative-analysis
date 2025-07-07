@@ -71,7 +71,7 @@ class InstrumentPlotter:
         ax1: plt.Axes = None
 
         fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
-        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}, {self.instrument.candle_span.value}", fontsize=16)
 
         self.subplot_ohlc(ax1, OHLCVUDEnum.CLOSE)
         ax1.set_title("Prices")
@@ -109,7 +109,7 @@ class InstrumentPlotter:
         ax1: plt.Axes = None
 
         fig, ax1 = plt.subplots(1, 1, figsize=(14, 8), sharex=True)
-        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}", fontsize=16)
+        fig.suptitle(title if title else f"{self.instrument.instrument_symbol}, {self.instrument.candle_span.value}", fontsize=16)
 
         self.subplot_volume(ax1)
         ax1.set_title("Volumes")

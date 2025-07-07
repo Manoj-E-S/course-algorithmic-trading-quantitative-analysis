@@ -113,6 +113,11 @@ class Portfolio:
     def in_incremental_mode(self) -> bool:
         return not self.__precomputed
     
+    @property
+    def pct_return(self) -> float:
+        return float((self.cumulative_returns_series.iloc[-1] - 1.0) * 100)
+
+
     @cached_property
     def portfolio_kpis(self) -> pd.DataFrame:
         rows = []
@@ -137,12 +142,6 @@ class Portfolio:
 
     @cached_property
     def returns_series(self) -> pd.Series:
-        """
-        Returns the returns Series for the portfolio.
-
-        :return: The returns Series.
-        :rtype: pd.Series
-        """
         current_holdings_returns_df: pd.DataFrame = self.__universe.closes_df[self.__current_holdings_kpis.index].loc[self.date_range].pct_change().fillna(0)
         weights: pd.Series = self.__current_holdings_kpis[InstrumentUniverse._Number_Of_Holdings_Column_Name]
         return current_holdings_returns_df.mul(weights, axis=1).sum(axis=1).div(weights.sum(), axis=0)
@@ -150,12 +149,6 @@ class Portfolio:
 
     @cached_property
     def cumulative_returns_series(self) -> pd.Series:
-        """
-        Returns the cumulative returns Series for the portfolio.
-
-        :return: The cumulative returns Series.
-        :rtype: pd.Series
-        """
         return (1 + self.returns_series).cumprod()
 
 
@@ -401,7 +394,7 @@ class Portfolio:
         """
         self.__metadata: pd.DataFrame = \
             pd.DataFrame(
-                index=pd.Index(['all_dates' if self.in_precomputed_mode else self.__end_date], name='date'),
+                index=pd.Index([f'{self.__start_date.date()} - {self.__end_date.date()}' if self.in_precomputed_mode else self.__end_date], name='date'),
                 columns=['optimization_strategy', 'number_of_holdings', 'kpi_risk_free_rate'],
                 data=[
                     [

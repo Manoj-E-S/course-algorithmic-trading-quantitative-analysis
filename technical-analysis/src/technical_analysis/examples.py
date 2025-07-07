@@ -34,7 +34,7 @@ class DefaultConstants:
     BRICK_SIZE: int = 100
     BRICK_SIZE_FROM_ATR: tuple[CandlespanEnum, int] = (CandlespanEnum.DAILY, 300)
     CACHE_OUTDATION_PERIOD_DAYS: int = 5
-    CANDLE_SPAN: CandlespanEnum = CandlespanEnum.DAILY
+    CANDLE_SPAN: CandlespanEnum = CandlespanEnum.MONTHLY
     SAMPLE_INSTRUMENT: str = 'RELIANCE.BSE'
     NA_STRATEGY: str = 'backfill'
     RISK_FREE_RATE: float = 0.06  # 6% annual risk-free rate
@@ -97,6 +97,9 @@ class DefaultConstants:
         'HEROMOTOCO.BSE',
         'INDUSINDBK.BSE', 
     ]
+
+    NIFTY_50_INDEX: str = 'NIFTYBEES.BSE'  # Nifty 50 Index equivalent
+    SENSEX_30_INDEX: str = 'SENSEXBEES.BSE'  # Sensex 30 Index equivalent
 
 
 def default_data_cleaning_provider() -> DataCleaningProvider:
@@ -165,6 +168,53 @@ def default_candlesticks(
     )
 
 
+def default_market_index() -> Instrument:
+    # Nifty 50 Index equivalent
+    return Instrument(
+        instrument_symbol=DefaultConstants.NIFTY_50_INDEX,
+        candle_span=DefaultConstants.CANDLE_SPAN,
+        data_view_provider=default_data_view_provider()
+    )
+
+
+def default_portfolio(
+    precomputed: bool = False
+) -> Portfolio:
+    """
+    Returns a default Portfolio.
+    """
+    nifty_50_universe = InstrumentUniverse(
+        instrument_symbols=DefaultConstants.NIFTY_50_UNIVERSE,
+        candle_span=DefaultConstants.CANDLE_SPAN,
+        data_view_provider=default_data_view_provider()
+    )
+
+    start_time = datetime.now()
+    print()
+    print(f"Start Portfolio Creation: {start_time}")
+    print()
+    portfolio = Portfolio(
+        number_of_holdings=10,
+        source_universe=nifty_50_universe,
+        enable_precomputed_mode=precomputed,
+        # start_date=datetime(2011, 10, 1, 0, 0, 0, 0, tzinfo=None),
+        # end_date=datetime(2019, 10, 1, 0, 0, 0, 0, tzinfo=None) if precomputed else None,
+        optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
+        optimizer_config=RebalancingOptimizerConfig(
+            number_of_replacements=3,
+            allow_repeated_replacements=True,
+            risk_free_rate=DefaultConstants.RISK_FREE_RATE,
+        )
+    )
+    end_time = datetime.now()
+    print()
+    print(f"End Portfolio Creation: {end_time}")
+    print(f"Time taken to create {'precomputed' if precomputed else 'incremental'} portfolio: {end_time - start_time}")
+    print()
+    
+    return portfolio
+
+
 def setup_response_caching():
     """
     Setup cache outdation threshold period
@@ -188,6 +238,69 @@ def configure_risk_free_rate_globally(risk_free_rate: float | None = None):
     from technical_analysis.config.risk_free_rate_config import GlobalRiskFreeRateConfig
     GlobalRiskFreeRateConfig.set(risk_free_rate or DefaultConstants.RISK_FREE_RATE)
     print(f"Global Risk-Free Rate set to {GlobalRiskFreeRateConfig.get()}")
+
+
+def print_portfolio_details(portfolio: Portfolio):
+    """
+    Print the details of the portfolio onto the console.
+    """
+    print()
+    print("Portfolio Optimization Strategy:")
+    pprint(portfolio.optimization_strategy.value)
+    print()
+    print("Portfolio Number of Holdings:")
+    pprint(portfolio.number_of_holdings)
+    print()
+    print("Portfolio Current Holdings:")
+    pprint(portfolio.current_holdings)
+    print()
+    print("Portfolio Current KPIs:")
+    pprint(portfolio.current_holdings_kpis)
+    print()
+    print("Portfolio Holding History:")
+    pprint(portfolio.holding_history)
+    print()
+    print("Portfolio Metadata:")
+    pprint(portfolio.metadata)
+    print()
+    print("Percentage return:")
+    pprint(portfolio.pct_return)
+    print()
+
+
+def compare_portfolio_with_benchmark(portfolio: Portfolio, benchmark: Instrument):
+    """
+    Compare the portfolio's performance with a benchmark index.
+    """
+    benchmark_plotter = InstrumentPlotter(benchmark)
+    benchmark_kpi = InstrumentKPI(benchmark)
+
+    portfolio_plotter = PortfolioPlotter(portfolio, benchmark)
+
+    print()
+    print("Portfolio KPIs:")
+    print()
+    pprint(portfolio.portfolio_kpis)
+    print()
+    print()
+    print(f"Benchmark KPIs: {benchmark.instrument_symbol}")
+    print()
+    print("CAGR\t\t\t\t:", benchmark_kpi.cagr(portfolio.start_date, portfolio.end_date))
+    print("Max Drawdown\t\t\t:", benchmark_kpi.max_drawdown(portfolio.start_date, portfolio.end_date))
+    print("Calmar Ratio\t\t\t:", benchmark_kpi.calamar_ratio(portfolio.start_date, portfolio.end_date))
+    print("Sharpe Ratio\t\t\t:", benchmark_kpi.sharpe_ratio(risk_free_rate=DefaultConstants.RISK_FREE_RATE, from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Sortino Ratio\t\t\t:", benchmark_kpi.sortino_ratio(risk_free_rate=DefaultConstants.RISK_FREE_RATE, from_date=portfolio.start_date, until_date=portfolio.end_date))
+    print("Annualized Volatility\t\t:", benchmark_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date))
+    print("Annualized Downside Volatility\t:", benchmark_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date, downside=True))
+    print()
+
+    benchmark_plotter.plot_price_line(
+        title=f"Benchmark {benchmark.instrument_symbol} prices",
+    )
+    portfolio_plotter.plot_cumulative_returns()
+    portfolio_plotter.plot_portfolio_vs_benchmark(
+        title=f"Portfolio vs {benchmark.instrument_symbol} Benchmark Cumulative Returns",
+    )
 
 
 def example_usage_instrument_group(
@@ -540,6 +653,39 @@ def example_usage_renko_dataframe(
     print(f"Renko DataFrame:\n{renko.renko_df}")
 
 
+def example_usage_precomputed_portfolio_workflow():
+    """
+    Example usage of the precomputed portfolio workflow.
+    """
+    portfolio = default_portfolio(precomputed=True)
+    market_index = default_market_index()
+    print_portfolio_details(portfolio)
+    compare_portfolio_with_benchmark(portfolio, market_index)
+
+
+def example_usage_incremental_portfolio_workflow(
+    step_size: int = 5,
+    test_all_stepping_methods: bool = False
+):
+    """
+    Example usage of the incremental portfolio workflow.
+    """
+    portfolio = default_portfolio(precomputed=False)
+    market_index = default_market_index()
+    
+    portfolio.step_up(step_size)
+    print_portfolio_details(portfolio)
+    compare_portfolio_with_benchmark(portfolio, market_index)
+
+    # TODO: While implementing testing test all scenarios in the portfolio stepping methods
+    if test_all_stepping_methods:
+        portfolio.step_back(step_size)
+        # Should have only the initial holdings
+
+        portfolio.step_to(datetime(2015, 5, 1, 0, 0, 0, 0, tzinfo=None))
+        # Should have holdings upto date nearest to 2015-05-01 (step_up_to)
+        # Or should have holdings of the first available date if 2015-05-01 is earlier than the start date (step_back_to)
+
 
 def main():
     """
@@ -605,121 +751,12 @@ def main():
     # example_usage_renko_dataframe(from_atr=True, brick_size_from_atr=brick_size_from_atr)
     # example_usage_renko_dataframe(from_atr=False, brick_size=brick_size)
 
-
     """
-    Portfolio Optimization Example
+    Portfolio Creation and Optimization
     """
-    nifty_50_universe = InstrumentUniverse(
-        instrument_symbols=DefaultConstants.NIFTY_50_UNIVERSE,
-        candle_span=CandlespanEnum.MONTHLY
-    )
+    example_usage_precomputed_portfolio_workflow()
+    # example_usage_incremental_portfolio_workflow(step_size=5, test_all_stepping_methods=False)
 
-    start_time = datetime.now()
-    print(f"Start Time: {start_time}")
-    portfolio = Portfolio(
-        number_of_holdings=10,
-        source_universe=nifty_50_universe,
-        enable_precomputed_mode=True,
-        start_date=datetime(2011, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        end_date=datetime(2019, 10, 1, 0, 0, 0, 0, tzinfo=None),
-        optimization_strategy=PortfolioOptimizationStrategy.REBALANCING,
-        optimizer_config=RebalancingOptimizerConfig(
-            number_of_replacements=3,
-            allow_repeated_replacements=True,
-            risk_free_rate=DefaultConstants.RISK_FREE_RATE,
-        )
-    )
-    end_time = datetime.now()
-    print(f"End Time: {end_time}")
-    print(f"Time taken to create portfolio: {end_time - start_time}")
-
-    # portfolio.step_up(3)
-    # portfolio.step_back(3)
-    # portfolio.step_to(datetime(2015, 5, 1, 0, 0, 0, 0, tzinfo=None))
-    # portfolio.step_to(datetime(2011, 2, 1, 0, 0, 0, 0, tzinfo=None))
-
-    print()
-    print("Portfolio Start Date:")
-    pprint(portfolio.start_date)
-    print()
-    print("Portfolio End Date:")
-    pprint(portfolio.end_date)
-    print()
-    print("Portfolio Optimization Strategy:")
-    pprint(portfolio.optimization_strategy.value)
-    print()
-    print("Portfolio Number of Holdings:")
-    pprint(portfolio.number_of_holdings)
-    print()
-    print("Portfolio Current Holdings:")
-    pprint(portfolio.current_holdings)
-    print()
-    print("Portfolio Current KPIs:")
-    pprint(portfolio.current_holdings_kpis)
-    print()
-    print("Portfolio Holding History:")
-    pprint(portfolio.holding_history)
-    print()
-    print("Portfolio Metadata:")
-    pprint(portfolio.metadata)
-    print()
-    print("Portfolio Returns Series:")
-    pprint(portfolio.returns_series)
-    print()
-    print("Portfolio Cumulative Returns Series:")
-    pprint(portfolio.cumulative_returns_series)
-    print()
-    print("Portfolio KPIs:")
-    pprint(portfolio.portfolio_kpis)
-    print()
-
-    """
-    Compare Portfolio KPIs with with the corresponding Index's KPIs.
-    """
-    nifty_50_index: Instrument = Instrument(
-        instrument_symbol='NIFTYBEES.BSE',
-        candle_span=CandlespanEnum.MONTHLY
-    )
-    nifty_50_index_kpi = InstrumentKPI(nifty_50_index)
-    
-    print()
-    print(f"Nifty 50 Index: {nifty_50_index_kpi.instrument.instrument_symbol}")
-    print()
-    print("CAGR\t\t\t\t:", nifty_50_index_kpi.cagr(portfolio.start_date, portfolio.end_date))
-    print("Max Drawdown\t\t\t:", nifty_50_index_kpi.max_drawdown(from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Calmar Ratio\t\t\t:", nifty_50_index_kpi.calamar_ratio(from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Sharpe Ratio\t\t\t:", nifty_50_index_kpi.sharpe_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Sortino Ratio\t\t\t:", nifty_50_index_kpi.sortino_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Annualized Volatility\t\t:", nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date))
-    print("Annualized Downside Volatility\t:", nifty_50_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date, downside=True))
-    print()
-
-    sensex_30_index: Instrument = Instrument(
-        instrument_symbol='SENSEXBEES.BSE',
-        candle_span=CandlespanEnum.MONTHLY
-    )
-    sensex_30_index_kpi = InstrumentKPI(sensex_30_index)
-
-    print()
-    print(f"SENSEX 30 Index: {sensex_30_index_kpi.instrument.instrument_symbol}")
-    print()
-    print("CAGR\t\t\t\t:", sensex_30_index_kpi.cagr(portfolio.start_date, portfolio.end_date))
-    print("Max Drawdown\t\t\t:", sensex_30_index_kpi.max_drawdown(from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Calmar Ratio\t\t\t:", sensex_30_index_kpi.calamar_ratio(from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Sharpe Ratio\t\t\t:", sensex_30_index_kpi.sharpe_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Sortino Ratio\t\t\t:", sensex_30_index_kpi.sortino_ratio(risk_free_rate=0.06, from_date=portfolio.start_date, until_date=portfolio.end_date))
-    print("Annualized Volatility\t\t:", sensex_30_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date))
-    print("Annualized Downside Volatility\t:", sensex_30_index_kpi.annualized_volatility(portfolio.start_date, portfolio.end_date, downside=True))
-    print()
-
-
-    """
-    Plot portfolio vs benchmark
-    """ 
-    portfolio_plotter = PortfolioPlotter(portfolio, nifty_50_index)
-    portfolio_plotter.plot_returns()
-    portfolio_plotter.plot_cumulative_returns()
-    portfolio_plotter.plot_portfolio_vs_benchmark()
 
 
 if __name__ == "__main__":
